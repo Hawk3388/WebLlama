@@ -43,7 +43,7 @@ class WebLlama():
         self.model = model
         self.embeddings = "nomic-embed-text"
         self.debug = False
-        self.websearch = False
+        self.websearch = True
         self.conversation_history = []
         if self.debug:
             logging.basicConfig(level=logging.INFO)
@@ -74,10 +74,7 @@ class WebLlama():
             # Eingabe für das Sprachmodell vorbereiten
             prompt_input = {"question": question, "documents": doc_texts, "history": history_text, "date": to_date}
             # Antwort des Sprachmodells streamen
-            for chunk in self.rag_chain.stream(prompt_input):
-                print(chunk, end="", flush=True)
-                answer += chunk
-            print("\n")
+            answer = self.rag_chain.stream(prompt_input)
             return answer
 
     # Main loop to handle user input
@@ -100,11 +97,14 @@ class WebLlama():
                     else:
                         logging.error("Keine URLs gefunden.")
                 else:
-                    self.conversation_history.append({"role": "user", "content": self.question})
                     answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True)
+                    full_answer = ""
                     for chunk in answer:
                         print(chunk.message.content, end="", flush=True)
+                        full_answer += chunk.message.content
                     print("\n")
+                    self.conversation_history.append({"role": "user", "content": self.question})
+                    self.conversation_history.append({"role": "assistant", "content": full_answer})
             except KeyboardInterrupt:
                 answer = None
                 print("\n")
@@ -200,9 +200,14 @@ class WebLlama():
     # Method to answer the query
     def answer_query(self):
         rag_app = self.build_rag()
+        full_answer = ""
         answer = rag_app.run(self.question, self.conversation_history)
+        for chunk in answer:
+            print(chunk, end="", flush=True)
+            full_answer += chunk
+        print("\n")
         self.conversation_history.append({"role": "user", "content": self.question})
-        self.conversation_history.append({"role": "assistant", "content": answer})
+        self.conversation_history.append({"role": "assistant", "content": full_answer})
 
     # Method to create a search query
     def search_query(self):
