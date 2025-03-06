@@ -1,1 +1,1 @@
-from .webllama import main, ChatWeb
+from .webllama import main, WebLlama

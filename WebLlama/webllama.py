@@ -33,14 +33,18 @@ def main():
         subprocess.run(["ollama"] + args)
 
 def run_model(model):
-    print(f"Running model {model}") 
+    WebLlama(model)
+    
 
 # Define the main ChatWeb class
-class ChatWeb():
-    def __init__(self):
+class WebLlama():
+    def __init__(self, model):
         # Initialize the model and other attributes
-        self.model, self.embeddings = self.get_model()
+        self.get_model(model)
+        self.model = model
+        self.embeddings = "nomic-embed-text"
         self.debug = False
+        self.websearch = False
         self.conversation_history = []
         if self.debug:
             logging.basicConfig(level=logging.INFO)
@@ -74,79 +78,59 @@ class ChatWeb():
             for chunk in self.rag_chain.stream(prompt_input):
                 print(chunk, end="", flush=True)
                 answer += chunk
-            print("")
+            print("\n")
             return answer
 
     # Main loop to handle user input
     def loop(self):
         while True:
-            self.question = input('>>> ')
-            if self.question.lower() == "/help":
-                print("Type /quit to exit the application.")
-                continue
-            if self.question.lower() == "/quit":
+            try:
+                self.question = input('>>> ')
+            except (KeyboardInterrupt, EOFError):
+                print("")
                 sys.exit()
-            self.search_query()
-            wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=20)
-            self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=20)
-            self.google_search()
-            if self.urls:
-                self.answer_query()
-            else:
-                logging.error("Keine URLs gefunden.")
+                
+            try:
+                if self.websearch:
+                    self.search_query()
+                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=20)
+                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=20)
+                    self.google_search()
+                    if self.urls:
+                        self.answer_query()
+                    else:
+                        logging.error("Keine URLs gefunden.")
+                else:
+                    self.conversation_history.append({"role": "user", "content": self.question})
+                    answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True)
+                    for chunk in answer:
+                        print(chunk.message.content, end="", flush=True)
+                    print("\n")
+            except KeyboardInterrupt:
+                answer = None
+                print("\n")
     
     # Method to get the model and embeddings model
-    def get_model(self):
-        models = ollama.list().models
-        embed_model = "nomic-embed-text"
-        emb_model = False
-        embed_models = ["nomic-embed-text", "mxbai-embed-large", "snowflake-arctic-embed", "bge-m3", "all-minilm", "bge-large", "paraphrase-multilingual", "snowflake-arctic-embed2", "granite-embedding"]
-        model = ""
-        dict_models = {}
-
-        for list_model in models:
-            if list_model.model.startswith(embed_model):
-                emb_model = True
-
-        if not emb_model:
-            print("No embedding model found. Downloading the embedding model.")
-            ollama.pull(embed_model)
-
-        if models:
-            print("Available models:")
-            i = 0
-            for list_model in models:
-                emb = False
-                for embe_model in embed_models:
-                    if list_model.model.startswith(embe_model):
-                        emb = True
-                        break
-                if not emb:
-                    print(f"{i+1} {list_model.model}")
-                    dict_models[i] = list_model.model
-                    i += 1
-
-        else:
-            logging.error("No models found. download a model with 'ollama run <model>'")
-            sys.exit()
-
-        while not model:
-            self.model_id = input("Chose a model: ")
+    def get_model(self, model):
+        try:
+            ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}])
+        except ollama.ResponseError:
             try:
-                model = dict_models[int(self.model_id)-1]
-                for embe_model in embed_models:
-                    if model.startswith(embe_model):
-                        model = ""
-                        continue
-                        
-            except Exception:
-                logging.error(" Model not found.")
+                ollama.pull(model)
+                ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}])
+            except ollama.ResponseError:
+                logging.error("Model not found.")
+                sys.exit()
 
-        ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}])
-
-        os.system("cls" if os.name == "nt" else "clear")
-
-        return model, embed_model
+    def commands(self):
+        if self.question.startswith("/"):
+            if self.question == "/help" or self.question == "/?":
+                print("Type /bye to exit the application.")
+            elif self.question == "/bye":
+                print("")
+                sys.exit()
+            else:
+                print(f"Unknown command '{self.question}'. Type /? for help")
 
     # Method to build the RAG application
     def build_rag(self):
