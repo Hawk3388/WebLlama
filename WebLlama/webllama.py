@@ -15,7 +15,6 @@ from datetime import date
 from pydantic import BaseModel
 from typing import Literal
 import subprocess
-import argparse
 import logging
 import ollama
 import sys

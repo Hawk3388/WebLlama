@@ -24,7 +24,6 @@ idna==3.10
 joblib==1.4.2
 jsonpatch==1.33
 jsonpointer==3.0.0
-keyboard==0.13.5
 langchain==0.3.20
 langchain-community==0.3.19
 langchain-core==0.3.41
