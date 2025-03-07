@@ -18,6 +18,7 @@ import subprocess
 import logging
 import ollama
 import sys
+import re
 
 def main():
     args = sys.argv[1:]  # Erste Argument (Scriptname) ignorieren
@@ -39,6 +40,20 @@ class WebLlama():
         self.model = model
         self.embeddings = "nomic-embed-text"
         self.debug = False
+        self.format = None
+        self.history = True
+        self.verbose = False
+        self.seed = None
+        self.predict = None
+        self.top_k = None
+        self.top_p = None
+        # self.min_p = None
+        self.num_ctx = 4096
+        self.temperature = None
+        self.repeat_penalty = None
+        self.repeat_last_n = None
+        self.num_gpu = None
+        self.stop = None
         self.websearch = True
         self.conversation_history = []
         if self.debug:
@@ -83,46 +98,8 @@ class WebLlama():
                 sys.exit()
             
             if self.question.startswith("/"):
-                if self.question == "/help" or self.question == "/?":
-                    print('''Available Commands:
-  /set            Set session variables
-  /show           Show model information
-  /load <model>   Load a session or model
-  /save <model>   Save your current session
-  /clear          Clear session context
-  /bye            Exit
-  /?, /help       Help for a command
-
-Use """ to begin a multi-line message.\n''')
-                    continue
-                elif self.question == "/bye":
-                    sys.exit()
-                elif self.question.startswith("/clear"):
-                    self.conversation_history = []
-                    print("Cleared session context")
-                    continue
-                elif self.question.startswith("/show"):
-                    if self.question.rstrip().endswith("info"):
-                        show = ollama.show(model=self.model)
-                        print(f""" Model
-    architecture        {show.modelinfo["general.architecture"]}
-    parameters          {show.details.parameter_size}
-    context length      {show.modelinfo["qwen2.context_length"]}
-    embedding length    {show.modelinfo["qwen2.embedding_length"]}
-    quantization        {show.details.quantization_level}""")
-                        continue
-                    else:
-                        print("""Available Commands:
-  /show info         Show details for this model
-  /show license      Show model license
-  /show modelfile    Show Modelfile for this model
-  /show parameters   Show parameters for this model
-  /show system       Show system message
-  /show template     Show prompt template\n""")
-                        continue
-                else:
-                    print(f"Unknown command '{self.question}'. Type /? for help")
-                    continue
+                self.commands()
+                continue
 
             try:
                 if self.websearch:
@@ -135,7 +112,8 @@ Use """ to begin a multi-line message.\n''')
                     else:
                         logging.error("Keine URLs gefunden.")
                 else:
-                    answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True)
+                    # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
+                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop).stream(self.conversation_history)
                     full_answer = ""
                     for chunk in answer:
                         print(chunk.message.content, end="", flush=True)
@@ -150,11 +128,11 @@ Use """ to begin a multi-line message.\n''')
     # Method to get the model and embeddings model
     def get_model(self, model):
         try:
-            ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}])
+            ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}], options={"num_ctx": self.num_ctx})
         except ollama.ResponseError:
             try:
                 ollama.pull(model)
-                ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}])
+                ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}], options={"num_ctx": self.num_ctx})
             except ollama.ResponseError:
                 logging.error("Model not found.")
                 sys.exit()
@@ -163,7 +141,7 @@ Use """ to begin a multi-line message.\n''')
         first_line = input(prompt)  # Get the first line of input
 
         # Check if the input starts with """
-        if first_line.strip().startswith('"""'):
+        if (first_line.strip().startswith('"""')):
             print("Multiline input detected. Enter more lines (finish with \"\"\"):")
             lines = []  # List for storing lines (excluding the first """)
 
@@ -176,6 +154,10 @@ Use """ to begin a multi-line message.\n''')
             return "\n".join(lines)  # Return the multiline input as a single string
 
         return first_line  # Return normal input if it doesn't start with """
+    
+    def extract_between_system_and_parameter(self, text):
+        match = re.search(r'SYSTEM(.*?)PARAMETER', text, flags=re.DOTALL)
+        return match.group(1).strip() if match else None  # Entfernt unnötige Leerzeichen
 
     # Method to build the RAG application
     def build_rag(self):
@@ -221,8 +203,18 @@ Use """ to begin a multi-line message.\n''')
         # Initialize the LLM with Llama 3.1 model
         llm = ChatOllama(
             model=self.model,
-            temperature=0.7,
-            num_ctx=4096,
+            temperature=self.temperature,
+            num_ctx=self.num_ctx,
+            format=self.format,
+            verbose=self.verbose,
+            seed=self.seed,
+            num_predict=self.predict,
+            top_k=self.top_k,
+            top_p=self.top_p,
+            repeat_penalty=self.repeat_penalty,
+            repeat_last_n=self.repeat_last_n,
+            num_gpu=self.num_gpu,
+            stop=self.stop,
         )
         # Create a chain combining the prompt template and LLM
         rag_chain = prompt | llm | StrOutputParser()
@@ -279,9 +271,163 @@ Use """ to begin a multi-line message.\n''')
             messages=message,
             model=self.model,
             format=self.Query.model_json_schema(),
-            options={"temperature": 0.5, "num_ctx": 4096}
+            options={"temperature": 0.5, "num_ctx": self.num_ctx}
         )
 
         format_query = self.Query.model_validate_json(response.message.content)
         self.query = format_query.search_query
         self.time = format_query.timerange
+
+    def commands(self):
+        if self.question == "/help" or self.question == "/?":
+            print('''Available Commands:
+/set            Set session variables
+/show           Show model information
+/load <model>   Load a session or model
+/save <model>   Save your current session
+/clear          Clear session context
+/bye            Exit
+/?, /help       Help for a command
+
+Use """ to begin a multi-line message.\n''')
+            
+        elif self.question == "/bye":
+            sys.exit()
+        elif self.question == "/clear":
+            self.conversation_history = []
+            print("Cleared session context")
+        elif self.question.startswith("/load"):
+            model = self.question.removeprefix("/load ").strip()
+            self.get_model(model)
+            self.model = model
+            print(f"Loading model '{model}'")
+            
+        elif self.question.startswith("/show"):
+            if self.question.rstrip().endswith("info"):
+                show = ollama.show(model=self.model)
+                print(f""" Model
+architecture        {show.modelinfo["general.architecture"]}
+parameters          {show.details.parameter_size}
+context length      {show.modelinfo["qwen2.context_length"]}
+embedding length    {show.modelinfo["qwen2.embedding_length"]}
+quantization        {show.details.quantization_level}""")
+                
+            elif self.question.rstrip().endswith("license"):
+                show = ollama.show(model=self.model)
+                licence = show.license if show.license else "No license was specified for this model."
+                print(licence)
+                
+            elif self.question.rstrip().endswith("modelfile"):
+                show = ollama.show(model=self.model)
+                print(show.modelfile)
+                
+            elif self.question.rstrip().endswith("parameters"):
+                show = ollama.show(model=self.model)
+                parameters = show.parameters if show.parameters else "No parameters were specified for this model."
+                print(parameters)
+                
+            elif self.question.rstrip().endswith("system"):
+                show = ollama.show(model=self.model)
+                system = self.extract_between_system_and_parameter(show.modelfile) if show.modelfile else "No system message was specified for this model."
+                print(system)
+                print("")
+                
+            elif self.question.rstrip().endswith("template"):
+                show = ollama.show(model=self.model)
+                print(show.template)
+                
+            else:
+                print("""Available Commands:
+/show info         Show details for this model
+/show license      Show model license
+/show modelfile    Show Modelfile for this model
+/show parameters   Show parameters for this model
+/show system       Show system message
+/show template     Show prompt template\n""")
+                
+        elif self.question.startswith("/set"):
+            if self.question.rstrip().endswith("debug"):
+                self.debug = True
+            elif self.question.rstrip().endswith("nodebug"):
+                self.debug = False
+            elif self.question.rstrip().endswith("history"):
+                self.history = True
+            elif self.question.rstrip().endswith("nohistory"):
+                self.history = False
+            elif self.question.rstrip().endswith("websearch"):
+                self.websearch = True
+            elif self.question.rstrip().endswith("nowebsearch"):
+                self.websearch = False
+            elif self.question.rstrip().endswith("format json"):
+                self.format = "json"
+            elif self.question.rstrip().endswith("noformat"):
+                self.format = None
+            elif self.question.rstrip().endswith("verbose"):
+                self.verbose = True
+            elif self.question.rstrip().endswith("quiet"):
+                self.verbose = False
+            elif self.question.startswith("/set system"):
+                system = self.question.removeprefix("/set system ").strip()
+                self.conversation_history.append({"role": "system", "content": system})
+            elif self.question.startswith("/set parameter"):
+                command = self.question.removeprefix("/set parameter ").strip()
+                if command.startswith("seed"):
+                    temp = command.removeprefix("seed ").strip()
+                    self.seed = int(temp) if temp.isnumeric() else None
+                    self.seed = None if self.seed == 0 else self.seed
+                elif command.startswith("num_predict"):
+                    temp = command.removeprefix("num_predict ").strip()
+                    self.predict = int(temp) if temp.isnumeric() else None
+                    self.predict = None if self.predict == 0 else self.predict
+                elif command.startswith("top_k"):
+                    temp = command.removeprefix("top_k ").strip()
+                    self.top_k = int(temp) if temp.isnumeric() else None
+                    self.top_k = None if self.top_k == 0 else self.top_k
+                elif command.startswith("top_p"):
+                    temp = command.removeprefix("top_p ").strip()
+                    self.top_p = float(temp) if temp.isnumeric() else None
+                    self.top_p = None if self.top_p == 0 else self.top_p
+                # elif command.startswith("min_p"):
+                #     temp = command.removeprefix("min_p ").strip()
+                #     self.min_p = float(temp) if temp.isnumeric() else None
+                #     self.min_p = None if self.min_p == 0 else self.min_p
+                elif command.startswith("num_ctx"):
+                    temp = command.removeprefix("num_ctx ").strip()
+                    self.num_ctx = int(temp) if temp.isnumeric() else None
+                    self.num_ctx = None if self.num_ctx == 0 else self.num_ctx
+                elif command.startswith("temperature"):
+                    temp = command.removeprefix("temperature ").strip()
+                    self.temperature = float(temp) if temp.isnumeric() else None
+                    self.temperature = None if self.temperature == 0 else self.temperature
+                elif command.startswith("repeat_penalty"):
+                    temp = command.removeprefix("repeat_penalty ").strip()
+                    self.repeat_penalty = float(temp) if temp.isnumeric() else None
+                    self.repeat_penalty = None if self.repeat_penalty == 0 else self.repeat_penalty
+                elif command.startswith("repeat_last_n"):
+                    temp = command.removeprefix("repeat_last_n ").strip()
+                    self.repeat_last_n = int(temp) if temp.isnumeric() else None
+                    self.repeat_last_n = None if self.repeat_last_n == 0 else self.repeat_last_n
+                elif command.startswith("num_gpu"):
+                    temp = command.removeprefix("num_gpu ").strip()
+                    self.num_gpu = int(temp) if temp.isnumeric() else None
+                    self.num_gpu = None if self.num_gpu == 0 else self.num_gpu
+                elif command.startswith("stop"):
+                    temp = command.removeprefix("stop ").strip()
+                    self.stop = temp.split()
+                    self.stop = None if self.stop == "" else self.stop
+                else:
+                    print("""Available Parameters:
+/set parameter seed <int>             Random number seed
+/set parameter num_predict <int>      Max number of tokens to predict
+/set parameter top_k <int>            Pick from top k num of tokens
+/set parameter top_p <float>          Pick token based on sum of probabilities
+/set parameter num_ctx <int>          Set the context size
+/set parameter temperature <float>    Set creativity level
+/set parameter repeat_penalty <float> How strongly to penalize repetitions
+/set parameter repeat_last_n <int>    Set how far back to look for repetitions
+/set parameter num_gpu <int>          The number of layers to send to the GPU
+/set parameter stop <string> <string> ...   Set the stop parameters\n""")
+
+                
+        else:
+            print(f"Unknown command '{self.question}'. Type /? for help")
