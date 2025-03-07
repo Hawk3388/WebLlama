@@ -68,6 +68,7 @@ Flags:
   -h, --help               help for run
       --keepalive string   Duration to keep a model loaded (e.g. 5m)
       --verbose            Show timings for response
+      --noweb              Disables the websearch
 
 Environment Variables:
       OLLAMA_HOST                IP Address for the ollama server (default 127.0.0.1:11434)
@@ -80,8 +81,33 @@ Environment Variables:
                     self.format = flags[index+1]
                 if "--keepalive" in flags:
                     index = flags.index("--keepalive")
-                    time = flags[index+1]
-                    self.keep_alive =  time if self.is_number(time[:-1]) and time[-1] in ["s", "m", "h"] else None
+                    keepalive_str = flags[index + 1]
+                    # Prüfe, ob das Format exakt "<Zahl><Einzelbuchstabe>" ist
+                    import re
+                    m = re.fullmatch(r'(\d+)([a-zA-Z]+)', keepalive_str)
+                    if m:
+                        number, unit = m.groups()
+                        if unit in ["s", "m", "h"]:
+                            self.keep_alive = keepalive_str
+                        else:
+                            print(f'Error: time: unknown unit "{unit}" in duration "{keepalive_str}"')
+                            sys.exit()
+                    else:
+                        # Prüfe auf das Format mit zusätzlichen Ziffern, z.B. "55s5" oder "55zt5"
+                        m2 = re.fullmatch(r'(\d+)([a-zA-Z]+)(\d+)$', keepalive_str)
+                        if m2:
+                            number, unit, extra = m2.groups()
+                            if unit in ["s", "m", "h"]:
+                                print(f'Error: time: missing unit in duration "{keepalive_str}"')
+                            else:
+                                print(f'Error: time: unknown unit "{unit}" in duration "{keepalive_str}"')
+                            sys.exit()
+                        else:
+                            print(f'Error: time: invalid duration "{keepalive_str}"')
+                            sys.exit()
+
+                if "--noweb" in flags:
+                    self.websearch = False
 
         self.get_model(model)
 
@@ -142,11 +168,13 @@ Environment Variables:
                         logging.error("Keine URLs gefunden.")
                 else:
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
-                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(self.conversation_history)
+                    convo = self.conversation_history.copy()
+                    convo.append({"role": "user", "content": self.question})
+                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo)
                     full_answer = ""
                     for chunk in answer:
-                        print(chunk.message.content, end="", flush=True)
-                        full_answer += chunk.message.content
+                        print(chunk.content, end="", flush=True)
+                        full_answer += chunk.content
                     print("\n")
                     self.conversation_history.append({"role": "user", "content": self.question})
                     self.conversation_history.append({"role": "assistant", "content": full_answer})
@@ -187,6 +215,9 @@ Environment Variables:
     def extract_between_system_and_parameter(self, text):
         match = re.search(r'SYSTEM(.*?)PARAMETER', text, flags=re.DOTALL)
         return match.group(1).strip() if match else None  # Entfernt unnötige Leerzeichen
+    
+    def finish_on_number(self, text):
+        return text[-1].isdigit() if text else False
     
     def is_number(self, text):
         try:
@@ -311,7 +342,7 @@ Environment Variables:
         #     options={"temperature": 0.5, "num_ctx": self.num_ctx}
         # )
 
-        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message)
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message)
 
         format_query = self.Query.model_validate_json(response.content)
         self.query = format_query.search_query
