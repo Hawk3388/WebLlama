@@ -28,15 +28,14 @@ def main():
         return
     
     if args[0] == "run" and len(args) > 1:
-        WebLlama(args[1])
+        WebLlama(args[1], args[2:])
     else:
         subprocess.run(["ollama"] + args)
 
 # Define the main ChatWeb class
 class WebLlama():
-    def __init__(self, model):
+    def __init__(self, model, flags):
         # Initialize the model and other attributes
-        self.get_model(model)
         self.model = model
         self.embeddings = "nomic-embed-text"
         self.debug = False
@@ -56,6 +55,36 @@ class WebLlama():
         self.stop = None
         self.websearch = True
         self.conversation_history = []
+        self.keep_alive = None
+        if flags:
+            if ("-h" or "--help") in flags:
+                print("""Run a model
+
+Usage:
+  ollama run MODEL [PROMPT] [flags]
+
+Flags:
+      --format string      Response format (e.g. json)
+  -h, --help               help for run
+      --keepalive string   Duration to keep a model loaded (e.g. 5m)
+      --verbose            Show timings for response
+
+Environment Variables:
+      OLLAMA_HOST                IP Address for the ollama server (default 127.0.0.1:11434)
+      OLLAMA_NOHISTORY           Do not preserve readline history\n""")
+            else:
+                if "--verbose" in flags:
+                    self.verbose = True
+                if "--format" in flags:
+                    index = flags.index("--format")
+                    self.format = flags[index+1]
+                if "--keepalive" in flags:
+                    index = flags.index("--keepalive")
+                    time = flags[index+1]
+                    self.keep_alive =  time if self.is_number(time[:-1]) and time[-1] in ["s", "m", "h"] else None
+
+        self.get_model(model)
+
         if self.debug:
             logging.basicConfig(level=logging.INFO)
         self.loop()
@@ -113,7 +142,7 @@ class WebLlama():
                         logging.error("Keine URLs gefunden.")
                 else:
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
-                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop).stream(self.conversation_history)
+                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(self.conversation_history)
                     full_answer = ""
                     for chunk in answer:
                         print(chunk.message.content, end="", flush=True)
@@ -128,11 +157,11 @@ class WebLlama():
     # Method to get the model and embeddings model
     def get_model(self, model):
         try:
-            ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}], options={"num_ctx": self.num_ctx})
+            ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
         except ollama.ResponseError:
             try:
                 ollama.pull(model)
-                ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}], options={"num_ctx": self.num_ctx})
+                ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
             except ollama.ResponseError:
                 print(f"Error: model '{model}' not found\n")
                 sys.exit()
@@ -158,6 +187,13 @@ class WebLlama():
     def extract_between_system_and_parameter(self, text):
         match = re.search(r'SYSTEM(.*?)PARAMETER', text, flags=re.DOTALL)
         return match.group(1).strip() if match else None  # Entfernt unnötige Leerzeichen
+    
+    def is_number(self, text):
+        try:
+            float(text)
+            return True
+        except ValueError:
+            return False
 
     # Method to build the RAG application
     def build_rag(self):
@@ -215,6 +251,7 @@ class WebLlama():
             repeat_last_n=self.repeat_last_n,
             num_gpu=self.num_gpu,
             stop=self.stop,
+            keep_alive=self.keep_alive,
         )
         # Create a chain combining the prompt template and LLM
         rag_chain = prompt | llm | StrOutputParser()
@@ -267,14 +304,16 @@ class WebLlama():
         message = self.conversation_history.copy()
         message.append({"role": "user", "content": prompt})
 
-        response = ollama.chat(
-            messages=message,
-            model=self.model,
-            format=self.Query.model_json_schema(),
-            options={"temperature": 0.5, "num_ctx": self.num_ctx}
-        )
+        # response = ollama.chat(
+        #     messages=message,
+        #     model=self.model,
+        #     format=self.Query.model_json_schema(),
+        #     options={"temperature": 0.5, "num_ctx": self.num_ctx}
+        # )
 
-        format_query = self.Query.model_validate_json(response.message.content)
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message)
+
+        format_query = self.Query.model_validate_json(response.content)
         self.query = format_query.search_query
         self.time = format_query.timerange
 
