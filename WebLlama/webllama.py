@@ -134,7 +134,7 @@ class WebLlama():
                 ollama.pull(model)
                 ollama.chat(model=model, messages=[{"role": "user", "content": "Test"}], options={"num_ctx": self.num_ctx})
             except ollama.ResponseError:
-                logging.error("Model not found.")
+                print(f"Error: model '{model}' not found\n")
                 sys.exit()
 
     def multiline_input(self, prompt=">>> "):
@@ -284,7 +284,6 @@ class WebLlama():
 /set            Set session variables
 /show           Show model information
 /load <model>   Load a session or model
-/save <model>   Save your current session
 /clear          Clear session context
 /bye            Exit
 /?, /help       Help for a command
@@ -298,9 +297,10 @@ Use """ to begin a multi-line message.\n''')
             print("Cleared session context")
         elif self.question.startswith("/load"):
             model = self.question.removeprefix("/load ").strip()
-            self.get_model(model)
-            self.model = model
-            print(f"Loading model '{model}'")
+            if model:
+                print(f"Loading model '{model}'")
+                self.get_model(model)
+                self.model = model   
             
         elif self.question.startswith("/show"):
             if self.question.rstrip().endswith("info"):
@@ -428,6 +428,18 @@ quantization        {show.details.quantization_level}""")
 /set parameter num_gpu <int>          The number of layers to send to the GPU
 /set parameter stop <string> <string> ...   Set the stop parameters\n""")
 
+            else:
+                print("""Available Commands:
+  /set parameter ...     Set a parameter
+  /set system <string>   Set system message
+  /set history           Enable history
+  /set nohistory         Disable history
+  /set wordwrap          Enable wordwrap
+  /set nowordwrap        Disable wordwrap
+  /set format json       Enable JSON mode
+  /set noformat          Disable formatting
+  /set verbose           Show LLM stats
+  /set quiet             Disable LLM stats\n""")
                 
         else:
             print(f"Unknown command '{self.question}'. Type /? for help")
