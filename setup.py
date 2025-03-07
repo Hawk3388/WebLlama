@@ -18,4 +18,6 @@ setup(
     author='Hawk3388',
     license='MIT',
     python_requires='>=3.10',
+    description="web search extension for ollama",
+    url="https://github.com/Hawk3388/webllama",
 )
