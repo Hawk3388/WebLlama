@@ -27,13 +27,9 @@ def main():
         return
     
     if args[0] == "run" and len(args) > 1:
-        run_model(args[1])
+        WebLlama(args[1])
     else:
         subprocess.run(["ollama"] + args)
-
-def run_model(model):
-    WebLlama(model)
-    
 
 # Define the main ChatWeb class
 class WebLlama():
