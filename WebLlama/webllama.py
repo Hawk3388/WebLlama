@@ -77,16 +77,58 @@ class WebLlama():
     def loop(self):
         while True:
             try:
-                self.question = input('>>> ')
+                self.question = self.multiline_input()
             except (KeyboardInterrupt, EOFError):
                 print("")
                 sys.exit()
-                
+            
+            if self.question.startswith("/"):
+                if self.question == "/help" or self.question == "/?":
+                    print('''Available Commands:
+  /set            Set session variables
+  /show           Show model information
+  /load <model>   Load a session or model
+  /save <model>   Save your current session
+  /clear          Clear session context
+  /bye            Exit
+  /?, /help       Help for a command
+
+Use """ to begin a multi-line message.\n''')
+                    continue
+                elif self.question == "/bye":
+                    sys.exit()
+                elif self.question.startswith("/clear"):
+                    self.conversation_history = []
+                    print("Cleared session context")
+                    continue
+                elif self.question.startswith("/show"):
+                    if self.question.rstrip().endswith("info"):
+                        show = ollama.show(model=self.model)
+                        print(f""" Model
+    architecture        {show.modelinfo["general.architecture"]}
+    parameters          {show.details.parameter_size}
+    context length      {show.modelinfo["qwen2.context_length"]}
+    embedding length    {show.modelinfo["qwen2.embedding_length"]}
+    quantization        {show.details.quantization_level}""")
+                        continue
+                    else:
+                        print("""Available Commands:
+  /show info         Show details for this model
+  /show license      Show model license
+  /show modelfile    Show Modelfile for this model
+  /show parameters   Show parameters for this model
+  /show system       Show system message
+  /show template     Show prompt template\n""")
+                        continue
+                else:
+                    print(f"Unknown command '{self.question}'. Type /? for help")
+                    continue
+
             try:
                 if self.websearch:
                     self.search_query()
-                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=20)
-                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=20)
+                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=10)
+                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=10)
                     self.google_search()
                     if self.urls:
                         self.answer_query()
@@ -117,15 +159,23 @@ class WebLlama():
                 logging.error("Model not found.")
                 sys.exit()
 
-    def commands(self):
-        if self.question.startswith("/"):
-            if self.question == "/help" or self.question == "/?":
-                print("Type /bye to exit the application.")
-            elif self.question == "/bye":
-                print("")
-                sys.exit()
-            else:
-                print(f"Unknown command '{self.question}'. Type /? for help")
+    def multiline_input(self, prompt=">>> "):
+        first_line = input(prompt)  # Get the first line of input
+
+        # Check if the input starts with """
+        if first_line.strip().startswith('"""'):
+            print("Multiline input detected. Enter more lines (finish with \"\"\"):")
+            lines = []  # List for storing lines (excluding the first """)
+
+            while True:
+                line = input()  # Read more lines
+                if line.strip() == '"""':  # Stop if a line only contains """
+                    break
+                lines.append(line)
+
+            return "\n".join(lines)  # Return the multiline input as a single string
+
+        return first_line  # Return normal input if it doesn't start with """
 
     # Method to build the RAG application
     def build_rag(self):
