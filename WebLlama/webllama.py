@@ -24,11 +24,36 @@ def main():
     args = sys.argv[1:]  # Erste Argument (Scriptname) ignorieren
     
     if not args:
-        print("Usage: webllama <command> [args...]")
+        print("""Usage:
+  webllama [flags]
+  webllama [command]
+
+Available Commands:
+  serve       Start ollama
+  create      Create a model from a Modelfile
+  show        Show information for a model
+  run         Run a model
+  stop        Stop a running model
+  pull        Pull a model from a registry
+  push        Push a model to a registry
+  list        List models
+  ps          List running models
+  cp          Copy a model
+  rm          Remove a model
+  help        Help about any command
+
+Flags:
+  -h, --help      help for webllama
+  -v, --version   Show version information
+
+Use "webllama [command] --help" for more information about a command.\n""")
         return
     
     if args[0] == "run" and len(args) > 1:
         WebLlama(args[1], args[2:])
+    elif args[0] == "--version":
+        print(f"webllama version is 1.0.0")
+        subprocess.run(["ollama"] + ["--version"])
     else:
         subprocess.run(["ollama"] + args)
 
