@@ -541,8 +541,6 @@ quantization        {show.details.quantization_level}""")
   /set system <string>   Set system message
   /set history           Enable history
   /set nohistory         Disable history
-  /set wordwrap          Enable wordwrap
-  /set nowordwrap        Disable wordwrap
   /set format json       Enable JSON mode
   /set noformat          Disable formatting
   /set verbose           Show LLM stats
