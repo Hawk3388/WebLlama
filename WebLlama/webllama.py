@@ -37,7 +37,7 @@ class WebLlama():
     def __init__(self, model, flags):
         # Initialize the model and other attributes
         self.model = model
-        self.embeddings = "nomic-embed-text"
+        self.embeddings = "paraphrase-multilingual"
         self.debug = False
         self.format = None
         self.history = True
@@ -69,6 +69,7 @@ Flags:
       --keepalive string   Duration to keep a model loaded (e.g. 5m)
       --verbose            Show timings for response
       --noweb              Disables the websearch
+      --debug              Enables debug mode
 
 Environment Variables:
       OLLAMA_HOST                IP Address for the ollama server (default 127.0.0.1:11434)
@@ -76,6 +77,8 @@ Environment Variables:
             else:
                 if "--verbose" in flags:
                     self.verbose = True
+                if "--debug" in flags:
+                    self.debug = True
                 if "--format" in flags:
                     index = flags.index("--format")
                     self.format = flags[index+1]
@@ -83,7 +86,6 @@ Environment Variables:
                     index = flags.index("--keepalive")
                     keepalive_str = flags[index + 1]
                     # Prüfe, ob das Format exakt "<Zahl><Einzelbuchstabe>" ist
-                    import re
                     m = re.fullmatch(r'(\d+)([a-zA-Z]+)', keepalive_str)
                     if m:
                         number, unit = m.groups()
@@ -134,7 +136,7 @@ Environment Variables:
             # Inhalt der abgerufenen Dokumente extrahieren
             doc_texts = "\n".join([doc.page_content for doc in documents])
             # Konversationverlauf formatieren
-            history_text = "\n".join([f"{entry['role']}: {entry['content']}" for entry in conversation_history])
+            history_text = "\n".join([f"{entry['role']}: {entry['content']}" for entry in conversation_history]) if conversation_history else ""
             # Aktuelles Datum im gewünschten Format
             to_date = date.today().strftime("%d.%m.%Y")
             # Eingabe für das Sprachmodell vorbereiten
@@ -168,16 +170,18 @@ Environment Variables:
                         logging.error("Keine URLs gefunden.")
                 else:
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
-                    convo = self.conversation_history.copy()
-                    convo.append({"role": "user", "content": self.question})
-                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo)
+                    if self.history:
+                        convo = self.conversation_history.copy()
+                        convo.append({"role": "user", "content": self.question})
+                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
                     full_answer = ""
                     for chunk in answer:
                         print(chunk.content, end="", flush=True)
                         full_answer += chunk.content
                     print("\n")
-                    self.conversation_history.append({"role": "user", "content": self.question})
-                    self.conversation_history.append({"role": "assistant", "content": full_answer})
+                    if self.history:
+                        self.conversation_history.append({"role": "user", "content": self.question})
+                        self.conversation_history.append({"role": "assistant", "content": full_answer})
             except KeyboardInterrupt:
                 answer = None
                 print("\n")
@@ -307,13 +311,15 @@ Environment Variables:
     def answer_query(self):
         rag_app = self.build_rag()
         full_answer = ""
+        self.conversation_history = self.conversation_history if self.history else []
         answer = rag_app.run(self.question, self.conversation_history)
         for chunk in answer:
             print(chunk, end="", flush=True)
             full_answer += chunk
         print("\n")
-        self.conversation_history.append({"role": "user", "content": self.question})
-        self.conversation_history.append({"role": "assistant", "content": full_answer})
+        if self.history:
+            self.conversation_history.append({"role": "user", "content": self.question})
+            self.conversation_history.append({"role": "assistant", "content": full_answer})
 
     # Method to create a search query
     def search_query(self):
@@ -332,8 +338,10 @@ Environment Variables:
     - 'y': Limit results to the past year. Use for annual events or information that changes yearly.
     - 'none': No time limit. Use for historical information or topics not tied to a specific time frame.
     """
-        message = self.conversation_history.copy()
-        message.append({"role": "user", "content": prompt})
+        
+        if self.history:
+            message = self.conversation_history.copy()
+            message.append({"role": "user", "content": prompt})
 
         # response = ollama.chat(
         #     messages=message,
@@ -342,11 +350,15 @@ Environment Variables:
         #     options={"temperature": 0.5, "num_ctx": self.num_ctx}
         # )
 
-        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message)
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message if self.history else prompt)
 
         format_query = self.Query.model_validate_json(response.content)
         self.query = format_query.search_query
         self.time = format_query.timerange
+
+        if self.debug:
+            print(self.query)
+            print(self.time)
 
     def commands(self):
         if self.question == "/help" or self.question == "/?":
