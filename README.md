@@ -10,8 +10,8 @@ WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama
 
 ## Requirements
 
-- Python >= 3.10
-- ollama if not download it from here: [download](https://ollama.com/download)
+- **Python**: Version 3.10 or higher (≥ 3.10)  
+- **Ollama**: If not installed, download it from [here](https://ollama.com/download)
 
 ## Installation
 
