@@ -1,6 +1,6 @@
 # WebLlama
 
-WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama), providing enhanced search capabilities, even for small models.
+WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama), providing enhanced search capabilities, even for smaller models.
 
 ## Features
 
@@ -68,7 +68,7 @@ webllama run <model_name>
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Author
 
