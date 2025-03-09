@@ -81,7 +81,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request on GitHub.
+Contributions are welcome! Please open an [issue](https://github.com/Hawk3388/WebLlama/issues) or submit a [pull request](https://github.com/Hawk3388/WebLlama/pulls) on GitHub.
 
 ## Acknowledgements
 
