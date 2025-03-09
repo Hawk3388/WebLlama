@@ -8,6 +8,11 @@ WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama
 - Integrate with [Ollama](https://github.com/ollama/ollama) for chat-based interactions
 - Support various search and retrieval configurations
 
+## Requirements
+
+- Python >= 3.10
+- ollama if not download it from here: [download](https://ollama.com/download)
+
 ## Installation
 
 To install WebLlama, download the .whl file from the [releases page](https://github.com/Hawk3388/webllama/releases) and install it via:
@@ -17,7 +22,7 @@ cd downloads
 pip install webllama-1.0.0-py3-none-any.whl
 ```
 
-if you encounter an error make sure you are on python >= 3.10 and you have wheel installed, if not install it:
+if you encounter an error during the installation make sure you have wheel installed, if not install it with:
 
 ```sh
 pip install wheel
