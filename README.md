@@ -1,16 +1,16 @@
 # WebLlama
 
-WebLlama is a web search extension for Ollama, providing enhanced search capabilities using various APIs and tools.
+WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama), providing enhanced search capabilities, even for small models.
 
 ## Features
 
-- Perform web searches using the DuckDuckGo API
-- Integrate with Ollama for chat-based interactions
+- Perform web searches using the [DuckDuckGo](https://github.com/deedy5/duckduckgo_search) API
+- Integrate with [Ollama](https://github.com/ollama/ollama) for chat-based interactions
 - Support various search and retrieval configurations
 
 ## Installation
 
-To install WebLlama, download the .whl file from the [releases](https://github.com/Hawk3388/webllama/releases) and install it via:
+To install WebLlama, download the .whl file from the [releases page](https://github.com/Hawk3388/webllama/releases) and install it via:
 
 ```sh
 cd downloads
