@@ -415,8 +415,8 @@ Use """ to begin a multi-line message.\n''')
                 print(f""" Model
 architecture        {show.modelinfo["general.architecture"]}
 parameters          {show.details.parameter_size}
-context length      {show.modelinfo["qwen2.context_length"]}
-embedding length    {show.modelinfo["qwen2.embedding_length"]}
+context length      {show.modelinfo[f"{show.details.family}.context_length"]}
+embedding length    {show.modelinfo[f"{show.details.family}.embedding_length"]}
 quantization        {show.details.quantization_level}""")
                 
             elif self.question.rstrip().endswith("license"):
