@@ -186,7 +186,8 @@ Environment Variables:
                 self.commands()
                 continue
 
-            prompt = f"""
+            if self.websearch:
+                prompt = f"""
 Today's date is {date.today().strftime("%d.%m.%Y")}.
 Based on the following user question, determine if additional context from internet pages is needed to answer the question:
 "{self.question}"
@@ -195,11 +196,9 @@ Your task:
 2. Decide if additional context from internet pages is necessary to provide a comprehensive answer.
 3. Respond with 'True' if additional context is needed, otherwise respond with 'False'.
 """
-            if self.history:
-                convo = self.conversation_history.copy()
-                convo.append({"role": "user", "content": prompt})
-            
-            if self.websearch:
+                if self.history:
+                    convo = self.conversation_history.copy()
+                    convo.append({"role": "user", "content": prompt})
                 response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
                 self.websearch = self.Websearch.model_validate_json(response.content).websearch
                 if self.debug:
