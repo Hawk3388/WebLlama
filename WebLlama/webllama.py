@@ -21,7 +21,7 @@ import sys
 import re
 
 def main():
-    args = sys.argv[1:]  # Erste Argument (Scriptname) ignorieren
+    args = sys.argv[1:]  # Ignore the first argument (script name)
     
     if not args:
         print("""Usage:
@@ -153,20 +153,20 @@ Environment Variables:
             self.retriever = retriever
             self.rag_chain = rag_chain
 
-        # Methode zum Ausführen der RAG-Anwendung mit Streaming
+        # Method to run the RAG application with streaming
         def run(self, question, conversation_history):
             answer = ""
-            # Relevante Dokumente abrufen
+            # Retrieve relevant documents
             documents = self.retriever.invoke(question)
-            # Inhalt der abgerufenen Dokumente extrahieren
+            # Extract content from the retrieved documents
             doc_texts = "\n".join([doc.page_content for doc in documents])
-            # Konversationverlauf formatieren
+            # Format conversation history
             history_text = "\n".join([f"{entry['role']}: {entry['content']}" for entry in conversation_history]) if conversation_history else ""
-            # Aktuelles Datum im gewünschten Format
+            # Current date in the desired format
             to_date = date.today().strftime("%d.%m.%Y")
-            # Eingabe für das Sprachmodell vorbereiten
+            # Prepare input for the language model
             prompt_input = {"question": question, "documents": doc_texts, "history": history_text, "date": to_date}
-            # Antwort des Sprachmodells streamen
+            # Stream the language model's response
             answer = self.rag_chain.stream(prompt_input)
             return answer
 
