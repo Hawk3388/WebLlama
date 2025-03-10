@@ -14,6 +14,7 @@ from langchain.prompts import PromptTemplate
 from datetime import date
 from pydantic import BaseModel
 from typing import Literal
+import importlib.metadata
 import subprocess
 import logging
 import ollama
@@ -52,7 +53,8 @@ Use "webllama [command] --help" for more information about a command.\n""")
     if args[0] == "run" and len(args) > 1:
         WebLlama(args[1], args[2:])
     elif args[0] == "--version":
-        print(f"webllama version is 1.1.0")
+        version = importlib.metadata.version("WebLlama")
+        print(f"webllama version is {version}")
         subprocess.run(["ollama"] + ["--version"])
     else:
         subprocess.run(["ollama"] + args)
