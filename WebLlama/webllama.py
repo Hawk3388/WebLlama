@@ -206,6 +206,7 @@ Your task:
 
             try:
                 if self.websearch:
+                    print("Performing web search...", end="\r")
                     self.search_query()
                     wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=10)
                     self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=10)
