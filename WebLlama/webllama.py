@@ -189,13 +189,21 @@ Environment Variables:
             if self.websearch_on:
                 prompt = f"""
 Today's date is {date.today().strftime("%d.%m.%Y")}.
-Based on the following user question, determine if additional context from internet pages is needed to answer the question:
-"{self.question}"
-Your task:
-1. Analyze the question.
-2. Decide if additional context from internet pages is necessary to provide a comprehensive answer.
-3. Respond with 'True' if additional context is needed, otherwise respond with 'False'.
+
+Task: Determine whether additional context from internet sources is required to answer the following user question.  
+
+**Instructions:**  
+1. Carefully analyze the user's question and the chat history.  
+2. Do NOT rely on any pre-existing knowledge or assumptions—only use the information explicitly stated in the chat history.  
+3. If the question requires recent, specific, or external information that is NOT present in the chat history (e.g., news, prices, schedules), respond with 'True'.  
+4. If all necessary information is available within the chat history, respond with 'False'.  
+5. If uncertain, default to 'True'.  
+
+**User question:** "{self.question}"  
+
+**Response:** Answer only with 'True' or 'False'. No additional text.  
 """
+
                 if self.history:
                     convo = self.conversation_history.copy()
                     convo.append({"role": "user", "content": prompt})
@@ -376,7 +384,7 @@ Your task:
     Based on the following user question, formulate a concise and effective search query:
     "{self.question}"
     Your task:
-    1. Create a search query of that will yield relevant results.
+    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question.
     2. Determine if a specific time range is needed for the search.
     Time range options:
     - 'd': Limit results to the past day. Use for very recent events or rapidly changing information.
