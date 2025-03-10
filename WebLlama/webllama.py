@@ -199,10 +199,11 @@ Your task:
                 convo = self.conversation_history.copy()
                 convo.append({"role": "user", "content": prompt})
             
-            response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
-            self.websearch = self.Websearch.model_validate_json(response.content).websearch
-            if self.debug:
-                print(self.websearch)
+            if self.websearch:
+                response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
+                self.websearch = self.Websearch.model_validate_json(response.content).websearch
+                if self.debug:
+                    print(self.websearch)
 
             try:
                 if self.websearch:
