@@ -5,7 +5,7 @@ def read_requirements():
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
 setup(
-    name='webllama',
+    name='WebLlama',
     version='1.0.0',
     packages=find_packages(),
     include_package_data=True,
