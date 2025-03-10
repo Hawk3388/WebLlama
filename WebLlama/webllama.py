@@ -52,7 +52,7 @@ Use "webllama [command] --help" for more information about a command.\n""")
     if args[0] == "run" and len(args) > 1:
         WebLlama(args[1], args[2:])
     elif args[0] == "--version":
-        print(f"webllama version is 1.0.0")
+        print(f"webllama version is 1.1.0")
         subprocess.run(["ollama"] + ["--version"])
     else:
         subprocess.run(["ollama"] + args)
@@ -147,6 +147,9 @@ Environment Variables:
         search_query: str
         timerange: Literal['d', 'w', 'm', 'y', 'none']
 
+    class Websearch(BaseModel):
+        websearch: bool
+
     # Define the RAG application class
     class RAGApplication:
         def __init__(self, retriever, rag_chain):
@@ -182,6 +185,24 @@ Environment Variables:
             if self.question.startswith("/"):
                 self.commands()
                 continue
+
+            prompt = f"""
+Today's date is {date.today().strftime("%d.%m.%Y")}.
+Based on the following user question, determine if additional context from internet pages is needed to answer the question:
+"{self.question}"
+Your task:
+1. Analyze the question.
+2. Decide if additional context from internet pages is necessary to provide a comprehensive answer.
+3. Respond with 'True' if additional context is needed, otherwise respond with 'False'.
+"""
+            if self.history:
+                convo = self.conversation_history.copy()
+                convo.append({"role": "user", "content": prompt})
+            
+            response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
+            self.websearch = self.Websearch.model_validate_json(response.content).websearch
+            if self.debug:
+                print(self.websearch)
 
             try:
                 if self.websearch:
