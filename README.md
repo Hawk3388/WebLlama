@@ -19,7 +19,7 @@ To install WebLlama, download the .whl file from the [releases page](https://git
 
 ```sh
 cd downloads
-pip install webllama-1.0.0-py3-none-any.whl
+pip install webllama-1.1.0-py3-none-any.whl
 ```
 
 if you encounter an error during the installation make sure you have wheel installed, if not install it with:
