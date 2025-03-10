@@ -78,7 +78,7 @@ class WebLlama():
         self.repeat_last_n = None
         self.num_gpu = None
         self.stop = None
-        self.websearch = True
+        self.websearch_on = True
         self.conversation_history = []
         self.keep_alive = None
         if flags:
@@ -134,7 +134,7 @@ Environment Variables:
                             sys.exit()
 
                 if "--noweb" in flags:
-                    self.websearch = False
+                    self.websearch_on = False
 
         self.get_model(model)
 
@@ -186,7 +186,7 @@ Environment Variables:
                 self.commands()
                 continue
 
-            if self.websearch:
+            if self.websearch_on:
                 prompt = f"""
 Today's date is {date.today().strftime("%d.%m.%Y")}.
 Based on the following user question, determine if additional context from internet pages is needed to answer the question:
@@ -209,7 +209,7 @@ Your task:
                     self.search_query()
                     wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=10)
                     self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=10)
-                    self.google_search()
+                    self.ddg_search()
                     if self.urls:
                         self.answer_query()
                     else:
@@ -342,7 +342,7 @@ Your task:
         return rag_application
 
     # Method to perform a Google search
-    def google_search(self):
+    def ddg_search(self):
         self.urls = []
         query = self.query.replace(" ", "+")
         results = self.search.invoke(query)
@@ -483,9 +483,9 @@ quantization        {show.details.quantization_level}""")
             elif self.question.rstrip().endswith("nohistory"):
                 self.history = False
             elif self.question.rstrip().endswith("websearch"):
-                self.websearch = True
+                self.websearch_on = True
             elif self.question.rstrip().endswith("nowebsearch"):
-                self.websearch = False
+                self.websearch_on = False
             elif self.question.rstrip().endswith("format json"):
                 self.format = "json"
             elif self.question.rstrip().endswith("noformat"):
