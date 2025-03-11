@@ -527,7 +527,9 @@ quantization        {show.details.quantization_level}""")
                 self.verbose = False
             elif self.question.startswith("/set system"):
                 system = self.question.removeprefix("/set system ").strip()
-                self.conversation_history.append({"role": "system", "content": system})
+                if self.conversation_history[0]["role"] == "system":
+                    self.conversation_history.pop(0)
+                self.conversation_history.insert(0, {"role": "system", "content": system})
             elif self.question.startswith("/set parameter"):
                 command = self.question.removeprefix("/set parameter ").strip()
                 if command.startswith("seed"):
@@ -574,6 +576,10 @@ quantization        {show.details.quantization_level}""")
                     temp = command.removeprefix("stop ").strip()
                     self.stop = temp.split()
                     self.stop = None if self.stop == "" else self.stop
+                elif command.startswith("num_results"):
+                    temp = command.removeprefix("num_results ").strip()
+                    self.seed = int(temp) if temp.isnumeric() else 15
+                    self.seed = 15 if self.seed <= 5 else self.seed
                 else:
                     print("""Available Parameters:
 /set parameter seed <int>             Random number seed
@@ -585,7 +591,8 @@ quantization        {show.details.quantization_level}""")
 /set parameter repeat_penalty <float> How strongly to penalize repetitions
 /set parameter repeat_last_n <int>    Set how far back to look for repetitions
 /set parameter num_gpu <int>          The number of layers to send to the GPU
-/set parameter stop <string> <string> ...   Set the stop parameters\n""")
+/set parameter stop <string> <string> ...   Set the stop parameters
+/set num_results <int>                Number of websites that are fetched\n""")
 
             else:
                 print("""Available Commands:
