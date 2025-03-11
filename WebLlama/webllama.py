@@ -80,6 +80,7 @@ class WebLlama():
         self.repeat_last_n = None
         self.num_gpu = None
         self.stop = None
+        self.num_results = 15
         self.websearch_on = True
         self.conversation_history = []
         self.keep_alive = None
@@ -192,18 +193,24 @@ Environment Variables:
                 prompt = f"""
 Today's date is {date.today().strftime("%d.%m.%Y")}.
 
-Task: Determine whether additional context from internet sources is required to answer the following user question.  
+Task: Determine whether additional context from internet sources is required to answer the user's question.  
 
 **Instructions:**  
 1. Carefully analyze the user's question and the chat history.  
-2. Do NOT rely on any pre-existing knowledge or assumptions—only use the information explicitly stated in the chat history.  
-3. If the question requires recent, specific, or external information that is NOT present in the chat history (e.g., news, prices, schedules), respond with 'True'.  
-4. If all necessary information is available within the chat history, respond with 'False'.  
-5. If uncertain, default to 'True'.  
+2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
+3. Respond with **'True'** if the question requires **external, real-time, or highly specific data** that is not available in the chat history. Examples:  
+   - Recent news, weather, stock prices, sports results, events.  
+   - Current product prices, availability, schedules, or policies.  
+   - Information about specific people, locations, or businesses not discussed in the chat.  
+4. Respond with **'False'** if:  
+   - The question can be answered based on the given chat history.  
+   - The question is general knowledge or common sense.  
+   - The question is conversational (e.g., greetings, small talk, "Thank you").  
+   - The question is vague but does not explicitly require external information.
+   - You are addressed.
+5. **Do NOT default to 'True' just because of uncertainty.** Only return 'True' if external data is clearly necessary.  
 
 **User question:** "{self.question}"  
-
-**Response:** Answer only with 'True' or 'False'. No additional text.  
 """
 
                 if self.history:
@@ -218,8 +225,8 @@ Task: Determine whether additional context from internet sources is required to 
                 if self.websearch:
                     print("Performing web search...", end="\r")
                     self.search_query()
-                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=10)
-                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=10)
+                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
+                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
                     self.ddg_search()
                     if self.urls:
                         self.answer_query()
@@ -229,6 +236,16 @@ Task: Determine whether additional context from internet sources is required to 
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
                     if self.history:
                         convo = self.conversation_history.copy()
+                        prompt = f"""
+You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+
+### **Instructions:**  
+1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
+2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
+3. If explicitly asked to correct something, then and only then should you provide corrections.  
+4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+"""
+                        convo.insert(0, {"role": "system", "content": prompt})
                         convo.append({"role": "user", "content": self.question})
                     answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
                     full_answer = ""
@@ -247,11 +264,11 @@ Task: Determine whether additional context from internet sources is required to 
     # Method to get the model and embeddings model
     def get_model(self, model):
         try:
-            ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
+            ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
         except ollama.ResponseError:
             try:
                 ollama.pull(model)
-                ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
+                ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
             except ollama.ResponseError:
                 print(f"Error: model '{model}' not found\n")
                 sys.exit()
@@ -319,6 +336,7 @@ Task: Determine whether additional context from internet sources is required to 
             template="""You are an assistant for question-answering tasks.
             Use the following documents and conversation history to answer the question.
             Answer always in the language of the question.
+            Don't repeat the question!
             Use three sentences maximum and keep the answer concise:
             Only for your context today's date: {date}, don't mention it in your answer
             Conversation History:
@@ -388,7 +406,7 @@ Task: Determine whether additional context from internet sources is required to 
     Based on the following user question, formulate a concise and effective search query:
     "{self.question}"
     Your task:
-    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question.
+    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question. If it is a topical question, it makes sense to include the date in the search query
     2. Determine if a specific time range is needed for the search.
     Time range options:
     - 'd': Limit results to the past day. Use for very recent events or rapidly changing information.

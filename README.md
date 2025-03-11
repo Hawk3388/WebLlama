@@ -15,24 +15,40 @@ WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama
 
 ## Installation
 
-To install WebLlama, download the .whl file from the [releases page](https://github.com/Hawk3388/WebLlama/releases) and install it via:
+To install WebLlama, you have two options:
 
-```sh
-cd downloads
-pip install webllama-1.1.1-py3-none-any.whl
-```
+1. Download the .whl file from the [releases page](https://github.com/Hawk3388/WebLlama/releases) and install it via:
 
-if you encounter an error during the installation make sure you have wheel installed, if not install it with:
+    ```sh
+    cd downloads
+    pip install webllama-1.1.2-py3-none-any.whl
+    ```
 
-```sh
-pip install wheel
-```
+    If you encounter an error during the installation, make sure you have wheel installed. If not, install it with:
 
-to confirm the installation run:
+    ```sh
+    pip install wheel
+    ```
 
-```sh
-webllama --version
-```
+    To confirm the installation, run:
+
+    ```sh
+    webllama --version
+    ```
+
+2. Alternatively, you can clone the repository and install it in editable mode:
+
+    ```sh
+    git clone https://github.com/Hawk3388/WebLlama.git
+    cd WebLlama
+    pip install -e .
+    ```
+
+    To confirm the installation, run:
+
+    ```sh
+    webllama --version
+    ```
 
 ## Usage
 
