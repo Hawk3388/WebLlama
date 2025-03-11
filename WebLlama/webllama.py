@@ -81,6 +81,7 @@ class WebLlama():
         self.num_gpu = None
         self.stop = None
         self.num_results = 15
+        self.given_results = 5
         self.websearch_on = True
         self.conversation_history = []
         self.keep_alive = None
@@ -329,7 +330,7 @@ You are an AI assistant named **WebLlama**. Your task is to process the user's i
             documents=doc_splits,
             embedding=OllamaEmbeddings(model=self.embeddings),
         )
-        retriever = vectorstore.as_retriever(k=5, similarity_threshold=0.7)  # Increase k and similarity threshold
+        retriever = vectorstore.as_retriever(k=self.given_results, similarity_threshold=0.7)
 
         # Define the prompt template for the LLM
         prompt = PromptTemplate(
@@ -347,7 +348,7 @@ You are an AI assistant named **WebLlama**. Your task is to process the user's i
             """,
             input_variables=["question", "documents", "history", "date"],
         )
-        # Initialize the LLM with Llama 3.1 model
+        # Initialize the LLM
         llm = ChatOllama(
             model=self.model,
             temperature=self.temperature,
@@ -534,52 +535,56 @@ quantization        {show.details.quantization_level}""")
                 command = self.question.removeprefix("/set parameter ").strip()
                 if command.startswith("seed"):
                     temp = command.removeprefix("seed ").strip()
-                    self.seed = int(temp) if temp.isnumeric() else None
-                    self.seed = None if self.seed == 0 else self.seed
+                    temp = int(temp) if temp.isnumeric() else self.seed
+                    self.seed = temp if temp == 0 else self.seed
                 elif command.startswith("num_predict"):
                     temp = command.removeprefix("num_predict ").strip()
-                    self.predict = int(temp) if temp.isnumeric() else None
-                    self.predict = None if self.predict == 0 else self.predict
+                    temp = int(temp) if temp.isnumeric() else self.predict
+                    self.predict = temp if temp > 0 else self.predict
                 elif command.startswith("top_k"):
                     temp = command.removeprefix("top_k ").strip()
-                    self.top_k = int(temp) if temp.isnumeric() else None
-                    self.top_k = None if self.top_k == 0 else self.top_k
+                    temp = int(temp) if temp.isnumeric() else self.top_k
+                    self.top_k = temp if temp > 0 else self.top_k
                 elif command.startswith("top_p"):
                     temp = command.removeprefix("top_p ").strip()
-                    self.top_p = float(temp) if temp.isnumeric() else None
-                    self.top_p = None if self.top_p == 0 else self.top_p
+                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.top_p
+                    self.top_p = temp if temp > 0 else self.top_p
                 # elif command.startswith("min_p"):
                 #     temp = command.removeprefix("min_p ").strip()
-                #     self.min_p = float(temp) if temp.isnumeric() else None
-                #     self.min_p = None if self.min_p == 0 else self.min_p
+                #     temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.min_p
+                #     self.min_p = temp if temp > 0 else self.min_p
                 elif command.startswith("num_ctx"):
                     temp = command.removeprefix("num_ctx ").strip()
-                    self.num_ctx = int(temp) if temp.isnumeric() else None
-                    self.num_ctx = None if self.num_ctx == 0 else self.num_ctx
+                    temp = int(temp) if temp.isnumeric() else self.num_ctx
+                    self.num_ctx = temp if temp > 0 else self.num_ctx
                 elif command.startswith("temperature"):
                     temp = command.removeprefix("temperature ").strip()
-                    self.temperature = float(temp) if temp.isnumeric() else None
-                    self.temperature = None if self.temperature == 0 else self.temperature
+                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.temperature
+                    self.temperature = temp if temp > 0 else self.temperature
                 elif command.startswith("repeat_penalty"):
                     temp = command.removeprefix("repeat_penalty ").strip()
-                    self.repeat_penalty = float(temp) if temp.isnumeric() else None
-                    self.repeat_penalty = None if self.repeat_penalty == 0 else self.repeat_penalty
+                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.repeat_penalty
+                    self.repeat_penalty = temp if temp > 0 else self.repeat_penalty
                 elif command.startswith("repeat_last_n"):
                     temp = command.removeprefix("repeat_last_n ").strip()
-                    self.repeat_last_n = int(temp) if temp.isnumeric() else None
-                    self.repeat_last_n = None if self.repeat_last_n == 0 else self.repeat_last_n
+                    temp = int(temp) if temp.isnumeric() else self.repeat_last_n
+                    self.repeat_last_n = temp if temp > 0 else self.repeat_last_n
                 elif command.startswith("num_gpu"):
                     temp = command.removeprefix("num_gpu ").strip()
-                    self.num_gpu = int(temp) if temp.isnumeric() else None
-                    self.num_gpu = None if self.num_gpu == 0 else self.num_gpu
+                    temp = int(temp) if temp.isnumeric() else self.num_gpu
+                    self.num_gpu = temp if temp > 0 else self.num_gpu
                 elif command.startswith("stop"):
                     temp = command.removeprefix("stop ").strip()
-                    self.stop = temp.split()
-                    self.stop = None if self.stop == "" else self.stop
+                    temp = temp.split()
+                    self.stop = temp if temp else self.stop
                 elif command.startswith("num_results"):
                     temp = command.removeprefix("num_results ").strip()
-                    self.seed = int(temp) if temp.isnumeric() else 15
-                    self.seed = 15 if self.seed <= 5 else self.seed
+                    temp = int(temp) if temp.isnumeric() else self.num_results
+                    self.num_results = temp if temp > 0 else self.num_results
+                elif command.startswith("given_results"):
+                    temp = command.removeprefix("given_results ").strip()
+                    temp = int(temp) if temp.isnumeric() else self.given_results
+                    self.given_results = temp if temp > 0 else self.given_results
                 else:
                     print("""Available Parameters:
 /set parameter seed <int>             Random number seed
@@ -592,7 +597,8 @@ quantization        {show.details.quantization_level}""")
 /set parameter repeat_last_n <int>    Set how far back to look for repetitions
 /set parameter num_gpu <int>          The number of layers to send to the GPU
 /set parameter stop <string> <string> ...   Set the stop parameters
-/set num_results <int>                Number of websites that are fetched\n""")
+/set parameter num_results <int>      Number of websites that are fetched
+/set parameter given_results <int>    Number of websites that the llm gets\n""")
 
             else:
                 print("""Available Commands:
