@@ -236,7 +236,7 @@ Task: Determine whether additional context from internet sources is required to 
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
                     if self.history:
                         convo = self.conversation_history.copy()
-                        prompt = f"""
+                        prompt = """
 You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
 
 ### **Instructions:**  
