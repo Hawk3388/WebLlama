@@ -36,12 +36,10 @@ To install WebLlama, you have two options:
     webllama --version
     ```
 
-2. Alternatively, you can clone the repository and install it in editable mode:
+2. Alternatively, you can install it directly from the main branch to try out the newest features:
 
     ```sh
-    git clone https://github.com/Hawk3388/WebLlama.git
-    cd WebLlama
-    pip install -e .
+    pip install git+https://github.com/Hawk3388/WebLlama.git@main
     ```
 
     To confirm the installation, run:

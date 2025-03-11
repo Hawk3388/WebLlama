@@ -5,7 +5,7 @@ def read_requirements():
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
     
 def read_version():
-    with open('version.txt', 'r') as file:
+    with open('VERSION.txt', 'r') as file:
         version = file.read().strip()
     return version
 
