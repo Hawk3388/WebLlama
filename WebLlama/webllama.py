@@ -199,7 +199,7 @@ Task: Determine whether additional context from internet sources is required to 
 **Instructions:**  
 1. Carefully analyze the user's question and the chat history.  
 2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
-3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet**. Examples:  
+3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet** or if your last knowledge update is too old to answer the question accurately. Examples:  
    - Recent news, weather, stock prices, sports results, events.  
    - Current product prices, availability, schedules, or policies.  
    - Information about specific people, locations, or businesses.
@@ -236,8 +236,9 @@ Task: Determine whether additional context from internet sources is required to 
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
                     if self.history:
                         convo = self.conversation_history.copy()
-                        prompt = """
+                        prompt = f"""
 You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 
 ### **Instructions:**  
 1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
