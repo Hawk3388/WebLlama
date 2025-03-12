@@ -148,7 +148,7 @@ Environment Variables:
         
     # Define a Pydantic model for the query
     class Query(BaseModel):
-        search_query: str
+        search_query: str | None
         timerange: Literal['d', 'w', 'm', 'y', 'none']
 
     class Websearch(BaseModel):
@@ -223,15 +223,38 @@ Task: Determine whether additional context from internet sources is required to 
 
             try:
                 if self.websearch:
-                    print("Performing web search...", end="\r")
                     self.search_query()
-                    wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
-                    self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
-                    self.ddg_search()
-                    if self.urls:
-                        self.answer_query()
+                    if self.query == None or self.query == 'None':
+                        if self.history:
+                            convo = self.conversation_history.copy()
+                            prompt = f"""
+    You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+    Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+
+    ### **Instructions:**  
+    1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
+    2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
+    3. If explicitly asked to correct something, then and only then should you provide corrections.  
+    4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+    """
+                            convo.insert(0, {"role": "system", "content": prompt})
+                            convo.append({"role": "user", "content": self.question})
+                        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+                        full_answer = ""
+                        print(" " * 30, end="\r")
+                        for chunk in self.answer:
+                            print(chunk.content, end="", flush=True)
+                            full_answer += chunk.content
+                        print("\n")
                     else:
-                        logging.error("Keine URLs gefunden.")
+                        print("Performing web search...", end="\r")
+                        wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
+                        self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
+                        self.ddg_search()
+                        if self.urls:
+                            self.answer_query()
+                        else:
+                            logging.error("Keine URLs gefunden.")
                 else:
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
                     if self.history:
@@ -248,18 +271,86 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 """
                         convo.insert(0, {"role": "system", "content": prompt})
                         convo.append({"role": "user", "content": self.question})
-                    answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
-                    full_answer = ""
-                    print(" " * 30, end="\r")
-                    for chunk in answer:
-                        print(chunk.content, end="", flush=True)
-                        full_answer += chunk.content
-                    print("\n")
-                    if self.history:
-                        self.conversation_history.append({"role": "user", "content": self.question})
-                        self.conversation_history.append({"role": "assistant", "content": full_answer})
+                    full_answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else self.question)
+                    if self.debug:
+                        print(full_answer.content)
+                    # full_answer = ""
+                    # print(" " * 30, end="\r")
+                    # for chunk in self.answer:
+                    #     print(chunk.content, end="", flush=True)
+                    #     full_answer += chunk.content
+                    # print("\n")
+                    f"""
+Today's date is {date.today().strftime("%d.%m.%Y")}.
+
+Task: Determine whether additional context from internet sources is required to answer the user's question based on the provided answer.
+
+**Instructions:**  
+1. Analyze the question and the given answer carefully.  
+2. Respond with **'True'** if the provided answer requires **external, real-time, or highly specific data from the Internet**. Examples:  
+   - The answer is incorrect or uncertain.  
+   - There is no clear answer.  
+   - The question refers to real-time information (e.g., news, weather, stock prices).  
+3. Respond with **'False'** if:  
+   - The answer is complete, correct, and does not require internet research.  
+   - The question is about general knowledge (e.g., math, history, defined concepts).  
+   - The question contains polite phrases, small talk, or expressions of gratitude.  
+   - The question is directly addressing you (e.g., "How are you?").  
+
+### Examples:
+   - "What is the capital of France?" → False  
+   - "What is the weather like today?" → True  
+   - "Thanks for your response!" → False  
+
+**User question:** "{self.question}"  
+**Provided answer:** "{full_answer}"  
+"""
+
+                    response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
+                    self.websearch = self.Websearch.model_validate_json(response.content).websearch
+                    if self.debug:
+                        print(self.websearch)
+                    if self.websearch:
+                        self.search_query()
+                        if self.query == None or self.query == 'None':
+                            if self.history:
+                                convo = self.conversation_history.copy()
+                                prompt = f"""
+        You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+        Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+
+        ### **Instructions:**  
+        1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
+        2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
+        3. If explicitly asked to correct something, then and only then should you provide corrections.  
+        4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+        """
+                                convo.insert(0, {"role": "system", "content": prompt})
+                                convo.append({"role": "user", "content": self.question})
+                            self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+                            full_answer = ""
+                            print(" " * 30, end="\r")
+                            for chunk in self.answer:
+                                print(chunk.content, end="", flush=True)
+                                full_answer += chunk.content
+                            print("\n")
+                        else:
+                            print("Performing web search...", end="\r")
+                            wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
+                            self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
+                            self.ddg_search()
+                            if self.urls:
+                                self.answer_query()
+                            else:
+                                logging.error("Keine URLs gefunden.")
+                    else:
+                        print(full_answer.content)
+                        # print("\n")
+                        if self.history:
+                            self.conversation_history.append({"role": "user", "content": self.question})
+                            self.conversation_history.append({"role": "assistant", "content": full_answer})
             except KeyboardInterrupt:
-                answer = None
+                self.answer = None
                 print("\n")
     
     # Method to get the model and embeddings model
@@ -401,9 +492,9 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
         rag_app = self.build_rag()
         full_answer = ""
         self.conversation_history = self.conversation_history if self.history else []
-        answer = rag_app.run(self.question, self.conversation_history)
+        self.answer = rag_app.run(self.question, self.conversation_history)
         print(" " * 30, end="\r")
-        for chunk in answer:
+        for chunk in self.answer:
             print(chunk, end="", flush=True)
             full_answer += chunk
         print("\n")
@@ -419,7 +510,7 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
     Based on the following user question, formulate a concise and effective search query:
     "{self.question}"
     Your task:
-    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question. If it is a topical question, it makes sense to include the date in the search query
+    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question. If it is a topical question, it makes sense to include the date in the search query. If there is not a question or it is a personal question return **None**. If it does not make sense to make a web search to answer the question also return **None**
     2. Determine if a specific time range is needed for the search.
     Time range options:
     - 'd': Limit results to the past day. Use for very recent events or rapidly changing information.
