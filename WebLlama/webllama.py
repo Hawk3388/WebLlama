@@ -265,13 +265,24 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
     # Method to get the model and embeddings model
     def get_model(self, model):
         try:
+            emb = OllamaEmbeddings(model=self.embeddings)
+            emb.embed_query("test")
+        except ollama.ResponseError:
+            try:
+                subprocess.run(["ollama"] + ["pull"] + [self.embeddings])
+                emb = OllamaEmbeddings(model=self.embeddings)
+                emb.embed_query("test")
+            except ollama.ResponseError:
+                print(f"Error: model '{self.embeddings}' not found\n")
+                sys.exit()
+        try:
             ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
         except ollama.ResponseError:
             try:
-                subprocess.run(["ollama"] + ["pull"] + [model])
+                subprocess.run(["ollama"] + ["pull"] + [self.model])
                 ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
             except ollama.ResponseError:
-                print(f"Error: model '{model}' not found\n")
+                print(f"Error: model '{self.model}' not found\n")
                 sys.exit()
 
     def multiline_input(self, prompt=">>> "):
