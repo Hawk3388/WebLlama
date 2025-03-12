@@ -199,17 +199,16 @@ Task: Determine whether additional context from internet sources is required to 
 **Instructions:**  
 1. Carefully analyze the user's question and the chat history.  
 2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
-3. Respond with **'True'** if the question requires **external, real-time, or highly specific data** that is not available in the chat history. Examples:  
+3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet**. Examples:  
    - Recent news, weather, stock prices, sports results, events.  
    - Current product prices, availability, schedules, or policies.  
-   - Information about specific people, locations, or businesses not discussed in the chat.  
+   - Information about specific people, locations, or businesses.
+   - Political events, election results, or government policies.
 4. Respond with **'False'** if:  
-   - The question can be answered based on the given chat history.  
-   - The question is general knowledge or common sense.  
+   - The question can be answered based on the given chat history.
    - The question is conversational (e.g., greetings, small talk, "Thank you").  
-   - The question is vague but does not explicitly require external information.
-   - You are addressed.
-5. **Do NOT default to 'True' just because of uncertainty.** Only return 'True' if external data is clearly necessary.  
+   - The question addresses you.
+5. If you are unsure about the answer, choose **'True'**.
 
 **User question:** "{self.question}"  
 """
@@ -336,6 +335,7 @@ You are an AI assistant named **WebLlama**. Your task is to process the user's i
         prompt = PromptTemplate(
             template="""You are an assistant for question-answering tasks.
             Use the following documents and conversation history to answer the question.
+            Don't give unnecessary Informations.
             Answer always in the language of the question.
             Don't repeat the question!
             Use three sentences maximum and keep the answer concise:
