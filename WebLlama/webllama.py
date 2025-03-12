@@ -290,7 +290,8 @@ Task: Determine whether additional context from internet sources is required to 
 2. Respond with **'True'** if the provided answer requires **external, real-time, or highly specific data from the Internet**. Examples:  
    - The answer is incorrect or uncertain.  
    - There is no clear answer.  
-   - The question refers to real-time information (e.g., news, weather, stock prices).  
+   - The question or the question refers to real-time information (e.g., news, weather, stock prices).
+   - The question needs any context to answer.  
 3. Respond with **'False'** if:  
    - The answer is complete, correct, and does not require internet research.  
    - The question is about general knowledge (e.g., math, history, defined concepts).  
