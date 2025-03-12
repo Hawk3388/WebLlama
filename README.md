@@ -21,7 +21,7 @@ To install WebLlama, you have two options:
 
     ```sh
     cd downloads
-    pip install webllama-1.1.2-py3-none-any.whl
+    pip install webllama-1.2.0-py3-none-any.whl
     ```
 
     If you encounter an error during the installation, make sure you have wheel installed. If not, install it with:
