@@ -622,7 +622,7 @@ quantization        {show.details.quantization_level}""")
                 self.websearch_on = True
             elif self.question.rstrip().endswith("nowebsearch"):
                 self.websearch_on = False
-            elif self.question.rstrip().endswith("format json"):
+            elif self.question.rstrip().endswith("format"):
                 self.format = "json"
             elif self.question.rstrip().endswith("noformat"):
                 self.format = None
@@ -762,10 +762,12 @@ quantization        {show.details.quantization_level}""")
   /set system <string>   Set system message
   /set history           Enable history
   /set nohistory         Disable history
-  /set format json       Enable JSON mode
+  /set format            Enable JSON mode
   /set noformat          Disable formatting
   /set verbose           Show LLM stats
-  /set quiet             Disable LLM stats\n""")
+  /set quiet             Disable LLM stats
+  /set debug             Enable debug mode
+  /set debug             Disable debug mode\n""")
                 
         else:
             print(f"Unknown command '{self.question}'. Type /? for help")
