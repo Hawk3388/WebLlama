@@ -638,57 +638,109 @@ quantization        {show.details.quantization_level}""")
             elif self.question.startswith("/set parameter"):
                 command = self.question.removeprefix("/set parameter ").strip()
                 if command.startswith("seed"):
-                    temp = command.removeprefix("seed ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.seed
+                    temp_ = command.removeprefix("seed ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.seed
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.seed
                     self.seed = temp if temp == 0 else self.seed
+                    print(f"Set parameter 'seed' to '{temp_}'")
                 elif command.startswith("num_predict"):
-                    temp = command.removeprefix("num_predict ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.predict
+                    temp_ = command.removeprefix("num_predict ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.predict
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.predict
                     self.predict = temp if temp > 0 else self.predict
+                    print(f"Set parameter 'num_predict' to '{temp_}'")
                 elif command.startswith("top_k"):
-                    temp = command.removeprefix("top_k ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.top_k
+                    temp_ = command.removeprefix("top_k ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.top_k
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.top_k
                     self.top_k = temp if temp > 0 else self.top_k
+                    print(f"Set parameter 'top_k' to '{temp_}'")
                 elif command.startswith("top_p"):
-                    temp = command.removeprefix("top_p ").strip()
-                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.top_p
+                    temp_ = command.removeprefix("top_p ").strip()
+                    if temp_.replace('.', '', 1).isnumeric():
+                        temp = float(temp_) if temp_.replace('.', '', 1).isnumeric() else self.top_p
+                    else:
+                        print(f"""Couldn't set parameter: "invalid float value [{temp_}]" """)
+                        temp = self.top_p
                     self.top_p = temp if temp > 0 else self.top_p
-                # elif command.startswith("min_p"):
-                #     temp = command.removeprefix("min_p ").strip()
-                #     temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.min_p
-                #     self.min_p = temp if temp > 0 else self.min_p
+                    print(f"Set parameter 'top_p' to '{temp_}'")
                 elif command.startswith("num_ctx"):
-                    temp = command.removeprefix("num_ctx ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.num_ctx
+                    temp_ = command.removeprefix("num_ctx ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.num_ctx
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.num_ctx
                     self.num_ctx = temp if temp > 0 else self.num_ctx
+                    print(f"Set parameter 'num_ctx' to '{temp_}'")
                 elif command.startswith("temperature"):
-                    temp = command.removeprefix("temperature ").strip()
-                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.temperature
+                    temp_ = command.removeprefix("temperature ").strip()
+                    if temp_.replace('.', '', 1).isnumeric():
+                        temp = float(temp_) if temp_.replace('.', '', 1).isnumeric() else self.temperature
+                    else:
+                        print(f"""Couldn't set parameter: "invalid float value [{temp_}]" """)
+                        temp = self.temperature
                     self.temperature = temp if temp > 0 else self.temperature
+                    print(f"Set parameter 'temperature' to '{temp_}'")
                 elif command.startswith("repeat_penalty"):
-                    temp = command.removeprefix("repeat_penalty ").strip()
-                    temp = float(temp) if temp.replace('.', '', 1).isnumeric() else self.repeat_penalty
+                    temp_ = command.removeprefix("repeat_penalty ").strip()
+                    if temp_.replace('.', '', 1).isnumeric():
+                        temp = float(temp_) if temp_.replace('.', '', 1).isnumeric() else self.repeat_penalty
+                    else:
+                        print(f"""Couldn't set parameter: "invalid float value [{temp_}]" """)
+                        temp = self.repeat_penalty
                     self.repeat_penalty = temp if temp > 0 else self.repeat_penalty
+                    print(f"Set parameter 'repeat_penalty' to '{temp_}'")
                 elif command.startswith("repeat_last_n"):
-                    temp = command.removeprefix("repeat_last_n ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.repeat_last_n
+                    temp_ = command.removeprefix("repeat_last_n ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.repeat_last_n
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.repeat_last_n
                     self.repeat_last_n = temp if temp > 0 else self.repeat_last_n
+                    print(f"Set parameter 'repeat_last_n' to '{temp_}'")
                 elif command.startswith("num_gpu"):
-                    temp = command.removeprefix("num_gpu ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.num_gpu
+                    temp_ = command.removeprefix("num_gpu ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.num_gpu
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.num_gpu
                     self.num_gpu = temp if temp > 0 else self.num_gpu
+                    print(f"Set parameter 'num_gpu' to '{temp_}'")
                 elif command.startswith("stop"):
-                    temp = command.removeprefix("stop ").strip()
-                    temp = temp.split()
+                    temp_ = command.removeprefix("stop ").strip()
+                    temp = temp_.split()
                     self.stop = temp if temp else self.stop
+                    print(f"Set parameter 'stop' to '{temp_}'")
                 elif command.startswith("num_results"):
-                    temp = command.removeprefix("num_results ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.num_results
+                    temp_ = command.removeprefix("num_results ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.num_results
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.num_results
                     self.num_results = temp if temp > 0 else self.num_results
+                    print(f"Set parameter 'num_results' to '{temp_}'")
                 elif command.startswith("given_results"):
-                    temp = command.removeprefix("given_results ").strip()
-                    temp = int(temp) if temp.isnumeric() else self.given_results
+                    temp_ = command.removeprefix("given_results ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.given_results
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.given_results
                     self.given_results = temp if temp > 0 else self.given_results
+                    print(f"Set parameter 'given_results' to '{temp_}'")
                 else:
                     print("""Available Parameters:
 /set parameter seed <int>             Random number seed
