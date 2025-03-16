@@ -269,7 +269,7 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
                         convo = self.conversation_history.copy()
                         convo.insert(0, {"role": "system", "content": prompt})
                         convo.append({"role": "user", "content": self.question})
-                    full_answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+                    self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
                     full_answer = ""
                     chunks = []
                     for chunk in self.answer:
@@ -343,8 +343,9 @@ Task: Determine whether additional context from internet sources is required to 
                                 logging.error("Keine URLs gefunden.")
                     else:
                         for chunk in chunks:
-                            print(chunk)
+                            print(chunk, end="", flush=True)
                             time.sleep(0.01)
+                        print("\n")
                         if self.history:
                             self.conversation_history.append({"role": "user", "content": self.question})
                             self.conversation_history.append({"role": "assistant", "content": full_answer})
