@@ -3,13 +3,14 @@ import os
 os.environ['USER_AGENT'] = 'MyCustomUserAgent/1.0'
 
 # Import necessary modules from langchain_community and other libraries
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+# from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import SKLearnVectorStore
-from langchain_community.tools import DuckDuckGoSearchResults
+# from langchain_community.tools import DuckDuckGoSearchResults
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from duckduckgo_search import DDGS
 from langchain.prompts import PromptTemplate
 from datetime import date
 from pydantic import BaseModel
@@ -80,8 +81,9 @@ class WebLlama():
         self.repeat_last_n = None
         self.num_gpu = None
         self.stop = None
-        self.num_results = 15
+        self.num_results = 100
         self.given_results = 5
+        self.num_links = 15
         self.websearch_on = True
         self.conversation_history = []
         self.keep_alive = None
@@ -149,7 +151,7 @@ Environment Variables:
     # Define a Pydantic model for the query
     class Query(BaseModel):
         search_query: str | None
-        timerange: Literal['d', 'w', 'm', 'y', 'none']
+        timerange: Literal['w', 'm', 'y', 'none']
 
     class Websearch(BaseModel):
         websearch: bool
@@ -248,8 +250,8 @@ Task: Determine whether additional context from internet sources is required to 
                         print("\n")
                     else:
                         print("Performing web search...", end="\r")
-                        wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
-                        self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
+                        # wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
+                        # self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
                         self.ddg_search()
                         if self.urls:
                             self.answer_query()
@@ -257,9 +259,7 @@ Task: Determine whether additional context from internet sources is required to 
                             logging.error("Keine URLs gefunden.")
                 else:
                     # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
-                    if self.history:
-                        convo = self.conversation_history.copy()
-                        prompt = f"""
+                    prompt = f"""
 You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
 Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 
@@ -269,18 +269,22 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 3. If explicitly asked to correct something, then and only then should you provide corrections.  
 4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
 """
+                    if self.history:
+                        convo = self.conversation_history.copy()
                         convo.insert(0, {"role": "system", "content": prompt})
                         convo.append({"role": "user", "content": self.question})
-                    full_answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else self.question)
-                    if self.debug:
-                        print(full_answer.content)
-                    # full_answer = ""
+                    full_answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+                    # if self.debug:
+                    #     print(full_answer.content)
+                    full_answer = ""
                     # print(" " * 30, end="\r")
-                    # for chunk in self.answer:
-                    #     print(chunk.content, end="", flush=True)
-                    #     full_answer += chunk.content
+                    for chunk in self.answer:
+                        # print(chunk.content, end="", flush=True)
+                        full_answer += chunk.content
                     # print("\n")
-                    f"""
+                    if self.debug:
+                        print(full_answer)
+                    prompt = f"""
 Today's date is {date.today().strftime("%d.%m.%Y")}.
 
 Task: Determine whether additional context from internet sources is required to answer the user's question based on the provided answer.
@@ -306,7 +310,9 @@ Task: Determine whether additional context from internet sources is required to 
 **User question:** "{self.question}"  
 **Provided answer:** "{full_answer}"  
 """
-
+                    if self.history:
+                        convo = self.conversation_history.copy()
+                        convo.append({"role": "user", "content": prompt})
                     response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
                     self.websearch = self.Websearch.model_validate_json(response.content).websearch
                     if self.debug:
@@ -337,8 +343,8 @@ Task: Determine whether additional context from internet sources is required to 
                             print("\n")
                         else:
                             print("Performing web search...", end="\r")
-                            wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
-                            self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
+                            # wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
+                            # self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
                             self.ddg_search()
                             if self.urls:
                                 self.answer_query()
@@ -417,6 +423,8 @@ Task: Determine whether additional context from internet sources is required to 
         for url in self.urls:
             try:
                 docs.append(WebBaseLoader(url).load())
+                if len(docs) >= self.num_links:
+                    break
             except Exception:
                 continue
 
@@ -479,13 +487,14 @@ Task: Determine whether additional context from internet sources is required to 
     # Method to perform a Google search
     def ddg_search(self):
         self.urls = []
-        query = self.query.replace(" ", "+")
-        results = self.search.invoke(query)
+        # query = self.query.replace(" ", "+")
+        # results = self.search.invoke(query)
+        results = DDGS().text(self.query, max_results=self.num_results, timelimit=self.time)
 
         for result in results:
-            self.urls.append(result['link'])
+            self.urls.append(result['href'])
             if self.debug:
-                print(result['link'])
+                print(result['href'])
         return self.urls
 
     # Method to answer the query
@@ -512,13 +521,18 @@ Task: Determine whether additional context from internet sources is required to 
     "{self.question}"
     Your task:
     1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question. If it is a topical question, it makes sense to include the date in the search query. If there is not a question or it is a personal question return **None**. If it does not make sense to make a web search to answer the question also return **None**
-    2. Determine if a specific time range is needed for the search.
-    Time range options:
-    - 'd': Limit results to the past day. Use for very recent events or rapidly changing information.
-    - 'w': Limit results to the past week. Use for recent events or topics with frequent updates.
-    - 'm': Limit results to the past month. Use for relatively recent information or ongoing events.
-    - 'y': Limit results to the past year. Use for annual events or information that changes yearly.
-    - 'none': No time limit. Use for historical information or topics not tied to a specific time frame.
+    2. Determine if a specific time range is needed for the search.  
+
+    **Time range options:**  
+    - `'w'` (past week): **Use for events or schedules that are updated frequently.** Example: "What shows are currently playing at the Kennedy Center?"  
+    - `'m'` (past month): Use for relatively recent information or ongoing events.  
+    - `'y'` (past year): Use for annual events or information that changes yearly.  
+    - `'none'`: No time limit. Use for historical information or topics not tied to a specific time frame.  
+
+    **Guidance:**  
+    - If you are unsure about the time range, **always default to 'none'**.  
+    - **For event schedules (e.g., theater plays, concerts, sports games), use `'w'`.**  
+    - **For ongoing topics, trends, or updates that develop over time, use `'m'`.**  
     """
         
         if self.history:
@@ -730,7 +744,7 @@ quantization        {show.details.quantization_level}""")
                     else:
                         print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
                         temp = self.num_results
-                    self.num_results = temp if temp > 0 else self.num_results
+                    self.num_results = temp if temp > 0 and temp > self.num_links else self.num_results
                     print(f"Set parameter 'num_results' to '{temp_}'")
                 elif command.startswith("given_results"):
                     temp_ = command.removeprefix("given_results ").strip()
@@ -739,8 +753,17 @@ quantization        {show.details.quantization_level}""")
                     else:
                         print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
                         temp = self.given_results
-                    self.given_results = temp if temp > 0 else self.given_results
+                    self.given_results = temp if temp > 0 and temp <= self.num_links else self.given_results
                     print(f"Set parameter 'given_results' to '{temp_}'")
+                elif command.startswith("num_links"):
+                    temp_ = command.removeprefix("num_links ").strip()
+                    if temp_.isnumeric():
+                        temp = int(temp_) if temp_.isnumeric() else self.num_links
+                    else:
+                        print(f"""Couldn't set parameter: "invalid int value [{temp_}]" """)
+                        temp = self.num_links
+                    self.num_links = temp if temp > 0 and temp < self.num_results else self.num_links
+                    print(f"Set parameter 'num_links' to '{temp_}'")
                 else:
                     print("""Available Parameters:
 /set parameter seed <int>             Random number seed
@@ -753,8 +776,9 @@ quantization        {show.details.quantization_level}""")
 /set parameter repeat_last_n <int>    Set how far back to look for repetitions
 /set parameter num_gpu <int>          The number of layers to send to the GPU
 /set parameter stop <string> <string> ...   Set the stop parameters
-/set parameter num_results <int>      Number of websites that are fetched
-/set parameter given_results <int>    Number of websites that the llm gets\n""")
+/set parameter num_results <int>      Number of links that are fetched
+/set parameter given_results <int>    Number of websites that the llm gets
+/set parameter num_links <int>        Number of websites that are fetched \n""")
 
             else:
                 print("""Available Commands:
