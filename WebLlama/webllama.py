@@ -3,10 +3,8 @@ import os
 os.environ['USER_AGENT'] = 'MyCustomUserAgent/1.0'
 
 # Import necessary modules from langchain_community and other libraries
-# from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores import SKLearnVectorStore
-# from langchain_community.tools import DuckDuckGoSearchResults
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama, OllamaEmbeddings
@@ -19,6 +17,7 @@ import importlib.metadata
 import subprocess
 import logging
 import ollama
+import time
 import sys
 import re
 
@@ -250,15 +249,12 @@ Task: Determine whether additional context from internet sources is required to 
                         print("\n")
                     else:
                         print("Performing web search...", end="\r")
-                        # wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
-                        # self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
                         self.ddg_search()
                         if self.urls:
                             self.answer_query()
                         else:
                             logging.error("Keine URLs gefunden.")
                 else:
-                    # answer = ollama.chat(model=self.model, messages=self.conversation_history, stream=True, format=self.format)
                     prompt = f"""
 You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
 Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
@@ -274,14 +270,11 @@ Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
                         convo.insert(0, {"role": "system", "content": prompt})
                         convo.append({"role": "user", "content": self.question})
                     full_answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
-                    # if self.debug:
-                    #     print(full_answer.content)
                     full_answer = ""
-                    # print(" " * 30, end="\r")
+                    chunks = []
                     for chunk in self.answer:
-                        # print(chunk.content, end="", flush=True)
+                        chunks.append(chunk.content)
                         full_answer += chunk.content
-                    # print("\n")
                     if self.debug:
                         print(full_answer)
                     prompt = f"""
@@ -343,16 +336,15 @@ Task: Determine whether additional context from internet sources is required to 
                             print("\n")
                         else:
                             print("Performing web search...", end="\r")
-                            # wrapper = DuckDuckGoSearchAPIWrapper(time=self.time, max_results=self.num_results)
-                            # self.search = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list", num_results=self.num_results)
                             self.ddg_search()
                             if self.urls:
                                 self.answer_query()
                             else:
                                 logging.error("Keine URLs gefunden.")
                     else:
-                        print(full_answer.content)
-                        # print("\n")
+                        for chunk in chunks:
+                            print(chunk)
+                            time.sleep(0.01)
                         if self.history:
                             self.conversation_history.append({"role": "user", "content": self.question})
                             self.conversation_history.append({"role": "assistant", "content": full_answer})
@@ -487,8 +479,6 @@ Task: Determine whether additional context from internet sources is required to 
     # Method to perform a Google search
     def ddg_search(self):
         self.urls = []
-        # query = self.query.replace(" ", "+")
-        # results = self.search.invoke(query)
         results = DDGS().text(self.query, max_results=self.num_results, timelimit=self.time)
 
         for result in results:
@@ -538,13 +528,6 @@ Task: Determine whether additional context from internet sources is required to 
         if self.history:
             message = self.conversation_history.copy()
             message.append({"role": "user", "content": prompt})
-
-        # response = ollama.chat(
-        #     messages=message,
-        #     model=self.model,
-        #     format=self.Query.model_json_schema(),
-        #     options={"temperature": 0.5, "num_ctx": self.num_ctx}
-        # )
 
         response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message if self.history else prompt)
 
