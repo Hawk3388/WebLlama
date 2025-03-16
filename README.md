@@ -17,7 +17,7 @@ WebLlama is a web search extension for [Ollama](https://github.com/ollama/ollama
 
 To install WebLlama, you have two options:
 
-1. Download the .whl file from the [releases page](https://github.com/Hawk3388/WebLlama/releases) and install it via:
+1. Download the latest .whl file from the [releases page](https://github.com/Hawk3388/WebLlama/releases) and install it via:
 
     ```sh
     cd downloads
