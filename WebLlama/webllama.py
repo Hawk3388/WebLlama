@@ -83,7 +83,8 @@ class WebLlama():
         self.num_results = 100
         self.given_results = 5
         self.num_links = 15
-        self.websearch_on = True
+        self.fullweb = False
+        self.noweb = False
         self.conversation_history = []
         self.keep_alive = None
         if flags:
@@ -99,6 +100,7 @@ Flags:
       --keepalive string   Duration to keep a model loaded (e.g. 5m)
       --verbose            Show timings for response
       --noweb              Disables the websearch
+      --fullweb            Enables the websearch for every request (not recommended)
       --debug              Enables debug mode
 
 Environment Variables:
@@ -139,9 +141,12 @@ Environment Variables:
                             sys.exit()
 
                 if "--noweb" in flags:
-                    self.websearch_on = False
+                    self.noweb = True
 
-        self.get_model(model)
+                if "--fullweb" in flags:
+                    self.fullweb = True
+
+        self.get_model()
 
         if self.debug:
             logging.basicConfig(level=logging.INFO)
@@ -190,132 +195,44 @@ Environment Variables:
             if self.question.startswith("/"):
                 self.commands()
                 continue
-
-            if self.websearch_on:
-                prompt = f"""
-Today's date is {date.today().strftime("%d.%m.%Y")}.
-
-Task: Determine whether additional context from internet sources is required to answer the user's question.  
-
-**Instructions:**  
-1. Carefully analyze the user's question and the chat history.  
-2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
-3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet** or if your last knowledge update is too old to answer the question accurately. Examples:  
-   - Recent news, weather, stock prices, sports results, events.  
-   - Current product prices, availability, schedules, or policies.  
-   - Information about specific people, locations, or businesses.
-   - Political events, election results, or government policies.
-4. Respond with **'False'** if:  
-   - The question can be answered based on the given chat history.
-   - The question is conversational (e.g., greetings, small talk, "Thank you").  
-   - The question addresses you.
-5. If you are unsure about the answer, choose **'True'**.
-
-**User question:** "{self.question}"  
-"""
-
-                if self.history:
-                    convo = self.conversation_history.copy()
-                    convo.append({"role": "user", "content": prompt})
-                response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
-                self.websearch = self.Websearch.model_validate_json(response.content).websearch
-                if self.debug:
-                    print(self.websearch)
-
+            
             try:
-                if self.websearch:
-                    self.search_query()
-                    if self.query == None or self.query == 'None':
-                        if self.history:
-                            convo = self.conversation_history.copy()
-                            prompt = f"""
-    You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
-    Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+                if self.fullweb == self.noweb:
+                    self.handle_websearch_prompt()
 
-    ### **Instructions:**  
-    1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
-    2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
-    3. If explicitly asked to correct something, then and only then should you provide corrections.  
-    4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
-    """
-                            convo.insert(0, {"role": "system", "content": prompt})
-                            convo.append({"role": "user", "content": self.question})
-                        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
-                        full_answer = ""
-                        print(" " * 30, end="\r")
-                        for chunk in self.answer:
-                            print(chunk.content, end="", flush=True)
-                            full_answer += chunk.content
-                        print("\n")
-                    else:
-                        print("Performing web search...", end="\r")
-                        self.ddg_search()
-                        if self.urls:
-                            self.answer_query()
-                        else:
-                            logging.error("Keine URLs gefunden.")
-                else:
-                    prompt = f"""
-You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
-Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
-
-### **Instructions:**  
-1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
-2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
-3. If explicitly asked to correct something, then and only then should you provide corrections.  
-4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
-"""
-                    if self.history:
-                        convo = self.conversation_history.copy()
-                        convo.insert(0, {"role": "system", "content": prompt})
-                        convo.append({"role": "user", "content": self.question})
-                    self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
-                    full_answer = ""
-                    chunks = []
-                    for chunk in self.answer:
-                        chunks.append(chunk.content)
-                        full_answer += chunk.content
-                    if self.debug:
-                        print(full_answer)
-                    prompt = f"""
-Today's date is {date.today().strftime("%d.%m.%Y")}.
-
-Task: Determine whether additional context from internet sources is required to answer the user's question based on the provided answer.
-
-**Instructions:**  
-1. Analyze the question and the given answer carefully.  
-2. Respond with **'True'** if the provided answer requires **external, real-time, or highly specific data from the Internet**. Examples:  
-   - The answer is incorrect or uncertain.  
-   - There is no clear answer.  
-   - The question or the question refers to real-time information (e.g., news, weather, stock prices).
-   - The question needs any context to answer.  
-3. Respond with **'False'** if:  
-   - The answer is complete, correct, and does not require internet research.  
-   - The question is about general knowledge (e.g., math, history, defined concepts).  
-   - The question contains polite phrases, small talk, or expressions of gratitude.  
-   - The question is directly addressing you (e.g., "How are you?").  
-
-### Examples:
-   - "What is the capital of France?" → False  
-   - "What is the weather like today?" → True  
-   - "Thanks for your response!" → False  
-
-**User question:** "{self.question}"  
-**Provided answer:** "{full_answer}"  
-"""
-                    if self.history:
-                        convo = self.conversation_history.copy()
-                        convo.append({"role": "user", "content": prompt})
-                    response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
-                    self.websearch = self.Websearch.model_validate_json(response.content).websearch
-                    if self.debug:
-                        print(self.websearch)
                     if self.websearch:
                         self.search_query()
                         if self.query == None or self.query == 'None':
-                            if self.history:
-                                convo = self.conversation_history.copy()
-                                prompt = f"""
+                            self.handle_chat_response()
+                        else:
+                            print("Performing web search...", end="\r")
+                            self.ddg_search()
+                            if self.urls:
+                                self.answer_query()
+                            else:
+                                logging.error("Keine URLs gefunden.")
+                    else:
+                        self.handle_no_websearch_prompt()
+                elif self.fullweb:
+                    if self.debug:
+                        print("fullweb")
+                    self.search_query()
+                    print("Performing web search...", end="\r")
+                    self.ddg_search()
+                    if self.urls:
+                        self.answer_query()
+                    else:
+                        logging.error("Keine URLs gefunden.")
+                elif self.noweb:
+                    if self.debug:
+                        print("noweb")
+                    self.handle_chat_response()
+            except KeyboardInterrupt:
+                self.answer = None
+                print("\n")
+
+    def handle_no_websearch_prompt(self):
+        prompt = f"""
         You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
         Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 
@@ -325,36 +242,158 @@ Task: Determine whether additional context from internet sources is required to 
         3. If explicitly asked to correct something, then and only then should you provide corrections.  
         4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
         """
-                                convo.insert(0, {"role": "system", "content": prompt})
-                                convo.append({"role": "user", "content": self.question})
-                            self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
-                            full_answer = ""
-                            print(" " * 30, end="\r")
-                            for chunk in self.answer:
-                                print(chunk.content, end="", flush=True)
-                                full_answer += chunk.content
-                            print("\n")
-                        else:
-                            print("Performing web search...", end="\r")
-                            self.ddg_search()
-                            if self.urls:
-                                self.answer_query()
-                            else:
-                                logging.error("Keine URLs gefunden.")
-                    else:
-                        for chunk in chunks:
-                            print(chunk, end="", flush=True)
-                            time.sleep(0.01)
-                        print("\n")
-                        if self.history:
-                            self.conversation_history.append({"role": "user", "content": self.question})
-                            self.conversation_history.append({"role": "assistant", "content": full_answer})
-            except KeyboardInterrupt:
-                self.answer = None
-                print("\n")
-    
+        if self.history:
+            convo = self.conversation_history.copy()
+            convo.insert(0, {"role": "system", "content": prompt})
+            convo.append({"role": "user", "content": self.question})
+        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+        full_answer = ""
+        chunks = []
+        for chunk in self.answer:
+            chunks.append(chunk.content)
+            full_answer += chunk.content
+        if self.debug:
+            print(full_answer)
+        self.handle_context_determination(full_answer, chunks)
+
+    def handle_context_determination(self, full_answer, chunks):
+        prompt = f"""
+        Today's date is {date.today().strftime("%d.%m.%Y")}.
+
+        Task: Determine whether additional context from internet sources is required to answer the user's question based on the provided answer.
+
+        **Instructions:**  
+        1. Analyze the question and the given answer carefully.  
+        2. Respond with **'True'** if the provided answer requires **external, real-time, or highly specific data from the Internet**. Examples:  
+        - The answer is incorrect or uncertain.  
+        - There is no clear answer.  
+        - The question or the question refers to real-time information (e.g., news, weather, stock prices).
+        - The question needs any context to answer.  
+        3. Respond with **'False'** if:  
+        - The answer is complete, correct, and does not require internet research.  
+        - The question is about general knowledge (e.g., math, history, defined concepts).  
+        - The question contains polite phrases, small talk, or expressions of gratitude.  
+        - The question is directly addressing you (e.g., "How are you?").  
+
+        ### Examples:
+        - "What is the capital of France?" → False  
+        - "What is the weather like today?" → True  
+        - "Thanks for your response!" → False  
+
+        **User question:** "{self.question}"  
+        **Provided answer:** "{full_answer}"  
+        """
+        if self.history:
+            convo = self.conversation_history.copy()
+            convo.append({"role": "user", "content": prompt})
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
+        self.websearch = self.Websearch.model_validate_json(response.content).websearch
+        if self.debug:
+            print(self.websearch)
+        if self.websearch:
+            self.handle_websearch_required()
+        else:
+            self.print_chunks(chunks, full_answer)
+
+    def handle_websearch_required(self):
+        self.search_query()
+        if self.query == None or self.query == 'None':
+            if self.history:
+                convo = self.conversation_history.copy()
+                prompt = f"""
+                You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+                Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+
+                ### **Instructions:**  
+                1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
+                2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
+                3. If explicitly asked to correct something, then and only then should you provide corrections.  
+                4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+                """
+                convo.insert(0, {"role": "system", "content": prompt})
+                convo.append({"role": "user", "content": self.question})
+            self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+            full_answer = ""
+            print(" " * 30, end="\r")
+            for chunk in self.answer:
+                print(chunk.content, end="", flush=True)
+                full_answer += chunk.content
+            print("\n")
+        else:
+            print("Performing web search...", end="\r")
+            self.ddg_search()
+            if self.urls:
+                self.answer_query()
+            else:
+                logging.error("Keine URLs gefunden.")
+
+    def print_chunks(self, chunks, full_answer):
+        for chunk in chunks:
+            print(chunk, end="", flush=True)
+            time.sleep(0.01)
+        print("\n")
+        if self.history:
+            self.conversation_history.append({"role": "user", "content": self.question})
+            self.conversation_history.append({"role": "assistant", "content": full_answer})
+
+    def handle_websearch_prompt(self):
+        prompt = f"""
+        Today's date is {date.today().strftime("%d.%m.%Y")}.
+
+        Task: Determine whether additional context from internet sources is required to answer the user's question.  
+
+        **Instructions:**  
+        1. Carefully analyze the user's question and the chat history.  
+        2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
+        3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet** or if your last knowledge update is too old to answer the question accurately. Examples:  
+        - Recent news, weather, stock prices, sports results, events.  
+        - Current product prices, availability, schedules, or policies.  
+        - Information about specific people, locations, or businesses.
+        - Political events, election results, or government policies.
+        4. Respond with **'False'** if:  
+        - The question can be answered based on the given chat history.
+        - The question is conversational (e.g., greetings, small talk, "Thank you").  
+        - The question addresses you.
+        5. If you are unsure about the answer, choose **'True'**.
+
+        **User question:** "{self.question}"  
+        """
+        if self.history:
+            convo = self.conversation_history.copy()
+            convo.append({"role": "user", "content": prompt})
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
+        self.websearch = self.Websearch.model_validate_json(response.content).websearch
+        if self.debug:
+            print(self.websearch)
+
+    def handle_chat_response(self):
+        prompt = f"""
+        You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
+        Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+
+        ### **Instructions:**  
+        1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
+        2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
+        3. If explicitly asked to correct something, then and only then should you provide corrections.  
+        4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+        """
+        if self.history:
+            convo = self.conversation_history.copy()
+            convo.insert(0, {"role": "system", "content": prompt})
+            convo.append({"role": "user", "content": self.question})
+        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+        full_answer = ""
+        print(" " * 30, end="\r")
+        for chunk in self.answer:
+            print(chunk.content, end="", flush=True)
+            full_answer += chunk.content
+        print("\n")
+        if self.history:
+            self.conversation_history.append({"role": "user", "content": self.question})
+            self.conversation_history.append({"role": "assistant", "content": full_answer})
+
     # Method to get the model and embeddings model
-    def get_model(self, model):
+    def get_model(self):
         try:
             emb = OllamaEmbeddings(model=self.embeddings)
             emb.embed_query("test")
@@ -561,8 +600,8 @@ Use """ to begin a multi-line message.\n''')
             model = self.question.removeprefix("/load ").strip()
             if model:
                 print(f"Loading model '{model}'")
-                self.get_model(model)
-                self.model = model   
+                self.model = model
+                self.get_model()
             
         elif self.question.startswith("/show"):
             if self.question.rstrip().endswith("info"):
@@ -616,10 +655,13 @@ quantization        {show.details.quantization_level}""")
                 self.history = True
             elif self.question.rstrip().endswith("nohistory"):
                 self.history = False
-            elif self.question.rstrip().endswith("websearch"):
-                self.websearch_on = True
-            elif self.question.rstrip().endswith("nowebsearch"):
-                self.websearch_on = False
+            elif self.question.rstrip().endswith("fullweb"):
+                self.fullweb = True
+            elif self.question.rstrip().endswith("noweb"):
+                self.noweb = True
+            elif self.question.rstrip().endswith("dynamicweb"):
+                self.fullweb = False
+                self.noweb = False
             elif self.question.rstrip().endswith("format"):
                 self.format = "json"
             elif self.question.rstrip().endswith("noformat"):
@@ -770,12 +812,15 @@ quantization        {show.details.quantization_level}""")
   /set system <string>   Set system message
   /set history           Enable history
   /set nohistory         Disable history
+  /set fullweb           Enable full web search
+  /set noweb             Disable web search
+  /set dynamicweb        Enable dynamic web search (default)
   /set format            Enable JSON mode
   /set noformat          Disable formatting
   /set verbose           Show LLM stats
   /set quiet             Disable LLM stats
   /set debug             Enable debug mode
-  /set debug             Disable debug mode\n""")
+  /set nodebug           Disable debug mode\n""")
                 
         else:
             print(f"Unknown command '{self.question}'. Type /? for help")
