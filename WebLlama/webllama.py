@@ -812,7 +812,7 @@ quantization        {show.details.quantization_level}""")
   /set system <string>   Set system message
   /set history           Enable history
   /set nohistory         Disable history
-  /set fullweb           Enable full web search
+  /set fullweb           Enable full web search (not recommended)
   /set noweb             Disable web search
   /set dynamicweb        Enable dynamic web search (default)
   /set format            Enable JSON mode
