@@ -30,23 +30,25 @@ To install WebLlama, you have two options:
     pip install wheel
     ```
 
-    To confirm the installation, run:
-
-    ```sh
-    webllama --version
-    ```
-
 2. Alternatively, you can install it directly from the main branch to try out the newest features:
 
     ```sh
     pip install git+https://github.com/Hawk3388/WebLlama.git@main
     ```
 
-    To confirm the installation, run:
+3. You can also build the package of the code directly:
 
     ```sh
-    webllama --version
+    git clone https://github.com/Hawk3388/WebLlama.git
+    cd WebLlama
+    pip install -e .
     ```
+
+To confirm the installation, run:
+
+```sh
+webllama --version
+```
 
 ## Usage
 
