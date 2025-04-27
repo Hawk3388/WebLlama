@@ -87,6 +87,11 @@ To run a model with WebLlama:
 webllama run <model_name>
 ```
 
+## ToDo's
+* Asyncio for parallel webscraping
+* Loading animation from ollama
+* Vision support
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
