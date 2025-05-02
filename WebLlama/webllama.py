@@ -551,19 +551,6 @@ Environment Variables:
     # Method to build the RAG application
     def build_rag(self):
         # List of URLs to load documents from
-        # docs = []
-
-        # for url in self.urls:
-        #     try:
-        #         docs.append(WebBaseLoader(url).load())
-        #         if len(docs) >= self.num_links:
-        #             break
-        #     except Exception:
-        #         continue
-
-        # docs_list = [item for sublist in docs for item in sublist]
-        # Initialize a text splitter with specified chunk size and overlap
-
         docs = asyncio.run(self.load_all())
         docs_list = [item for sublist in docs for item in sublist]
 
