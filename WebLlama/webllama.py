@@ -321,20 +321,25 @@ Environment Variables:
             think = False
             remove_newlines_after_think = False
             for chunk in self.answer:
-                if "<think>" in chunk.content:
-                    think = True
-                    print("thinking...", end="\r")
-                if remove_newlines_after_think:
-                    chunk.content = chunk.content.lstrip("\n")
-                    if chunk.content:
-                        remove_newlines_after_think = False
-                if not think:
-                    print(chunk.content, end="", flush=True)
-                    full_answer += chunk.content
-                if "</think>" in chunk.content:
-                    think = False
-                    remove_newlines_after_think = True
-                    print(" " * 30, end="\r")
+                chunk = chunk.content
+                if not self.debug:
+                    if "<think>" in chunk:
+                        think = True
+                        print("thinking...", end="\r")
+                    if remove_newlines_after_think:
+                        chunk = chunk.lstrip("\n")
+                        if chunk:
+                            remove_newlines_after_think = False
+                    if not think:
+                        print(chunk, end="", flush=True)
+                    if "</think>" in chunk:
+                        think = False
+                        remove_newlines_after_think = True
+                        print(" " * 30, end="\r")
+                    full_answer += chunk
+                else:
+                    print(chunk, end="", flush=True)
+                    full_answer += chunk
             print("\n")
         else:
             print("Performing web search...", end="\r")
@@ -435,20 +440,25 @@ Environment Variables:
         think = False
         remove_newlines_after_think = False
         for chunk in self.answer:
-            if "<think>" in chunk.content:
-                think = True
-                print("thinking...", end="\r")
-            if remove_newlines_after_think:
-                chunk.content = chunk.content.lstrip("\n")
-                if chunk.content:
-                    remove_newlines_after_think = False
-            if not think:
-                print(chunk.content, end="", flush=True)
-                full_answer += chunk.content
-            if "</think>" in chunk.content:
-                think = False
-                remove_newlines_after_think = True
-                print(" " * 30, end="\r")
+            chunk = chunk.content
+            if not self.debug:
+                if "<think>" in chunk:
+                    think = True
+                    print("thinking...", end="\r")
+                if remove_newlines_after_think:
+                    chunk = chunk.lstrip("\n")
+                    if chunk:
+                        remove_newlines_after_think = False
+                if not think:
+                    print(chunk, end="", flush=True)
+                if "</think>" in chunk:
+                    think = False
+                    remove_newlines_after_think = True
+                    print(" " * 30, end="\r")
+                full_answer += chunk
+            else:
+                print(chunk, end="", flush=True)
+                full_answer += chunk
         print("\n")
         if self.history:
             self.conversation_history.append({"role": "user", "content": self.question})
@@ -607,20 +617,25 @@ Environment Variables:
         think = False
         remove_newlines_after_think = False
         for chunk in self.answer:
-            if "<think>" in chunk:
-                think = True
-                print("thinking...", end="\r")
-            if remove_newlines_after_think:
-                chunk = chunk.lstrip("\n")
-                if chunk:
-                    remove_newlines_after_think = False
-            if not think:
+            if not self.debug:
+                if "<think>" in chunk:
+                    think = True
+                    print("thinking...", end="\r")
+                if remove_newlines_after_think:
+                    chunk = chunk.lstrip("\n")
+                    if chunk:
+                        remove_newlines_after_think = False
+                if not think:
+                    print(chunk, end="", flush=True)
+                if "</think>" in chunk:
+                    think = False
+                    remove_newlines_after_think = True
+                    print(" " * 30, end="\r")
+                full_answer += chunk
+            else:
                 print(chunk, end="", flush=True)
                 full_answer += chunk
-            if "</think>" in chunk:
-                think = False
-                remove_newlines_after_think = True
-                print(" " * 30, end="\r")
+
         print("\n")
         if self.history:
             self.conversation_history.append({"role": "user", "content": self.question})
