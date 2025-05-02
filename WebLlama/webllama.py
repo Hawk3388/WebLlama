@@ -318,8 +318,16 @@ Environment Variables:
             full_answer = ""
             print(" " * 30, end="\r")
             for chunk in self.answer:
-                print(chunk.content, end="", flush=True)
-                full_answer += chunk.content
+                if "<think>" in chunk.content:
+                    think = True
+                    print("thinking...", end="\r")
+                if not think:
+                    chunk.content = chunk.content.replace("\n", "")
+                    print(chunk.content, end="", flush=True)
+                    full_answer += chunk.content
+                if "</think>" in chunk.content:
+                    think = False
+                    print(" " * 30, end="\r")
             print("\n")
         else:
             print("Performing web search...", end="\r")
@@ -417,10 +425,19 @@ Environment Variables:
             convo.append({"role": "user", "content": self.question})
         self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
         full_answer = ""
+        think = False
         print(" " * 30, end="\r")
         for chunk in self.answer:
-            print(chunk.content, end="", flush=True)
-            full_answer += chunk.content
+            if "<think>" in chunk.content:
+                think = True
+                print("thinking...", end="\r")
+            if not think:
+                chunk.content = chunk.content.replace("\n", "")
+                print(chunk.content, end="", flush=True)
+                full_answer += chunk.content
+            if "</think>" in chunk.content:
+                think = False
+                print(" " * 30, end="\r")
         print("\n")
         if self.history:
             self.conversation_history.append({"role": "user", "content": self.question})
@@ -577,8 +594,16 @@ Environment Variables:
         self.answer = rag_app.run(self.question, self.conversation_history)
         print(" " * 30, end="\r")
         for chunk in self.answer:
-            print(chunk, end="", flush=True)
-            full_answer += chunk
+            if "<think>" in chunk:
+                think = True
+                print("thinking...", end="\r")
+            if not think:
+                chunk = chunk.replace("\n", "")
+                print(chunk, end="", flush=True)
+                full_answer += chunk
+            if "</think>" in chunk:
+                think = False
+                print(" " * 30, end="\r")
         print("\n")
         if self.history:
             self.conversation_history.append({"role": "user", "content": self.question})
