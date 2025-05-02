@@ -17,6 +17,7 @@ import importlib.metadata
 import subprocess
 import logging
 import ollama
+import threading
 import time
 import sys
 import re
@@ -87,6 +88,7 @@ class WebLlama():
         self.noweb = False
         self.conversation_history = []
         self.keep_alive = None
+        self._stop_event = threading.Event()
         if flags:
             if ("-h" or "--help") in flags:
                 print("""Run a model
@@ -336,6 +338,38 @@ Environment Variables:
             self.conversation_history.append({"role": "user", "content": self.question})
             self.conversation_history.append({"role": "assistant", "content": full_answer})
 
+    def loading_animation(self):
+        # Configuration
+        total_dots = 6       # Number of dots in a Braille character
+        visible = 3          # Number of visible dots
+        delay = 0.18         # Seconds per frame
+        frames = total_dots  # Animation frames
+
+        # Mapping of path indices (0-5) to Braille dots (2 columns x 3 rows)
+        # Circle: top left=1, top right=4, middle right=5, bottom right=6, bottom left=3, middle left=2
+        dot_map = [1, 4, 5, 6, 3, 2]
+
+        try:
+            while not self._stop_event.is_set():
+                for frame in range(frames):
+                    # Determine visible indices in the path
+                    vis_path = [(frame + i) % total_dots for i in range(visible)]
+                    # Calculate Braille pattern
+                    bits = 0
+                    for idx in vis_path:
+                        dot = dot_map[idx] - 1
+                        bits |= (1 << dot)
+                    char = chr(0x2800 + bits)
+
+                    # Output: return to the beginning of the line and print
+                    sys.stdout.write(f"\r{char}")
+                    sys.stdout.flush()
+                    time.sleep(delay)
+        finally:
+            # Clear the line when the loading animation stops
+            sys.stdout.write("\r" + " " * 30 + "\r")
+            sys.stdout.flush()	
+
     def handle_websearch_prompt(self):
         prompt = f"""
         Today's date is {date.today().strftime("%d.%m.%Y")}.
@@ -394,10 +428,14 @@ Environment Variables:
 
     # Method to get the model and embeddings model
     def get_model(self):
+        thread = threading.Thread(target=self.loading_animation)
+        thread.start()
         try:
             emb = OllamaEmbeddings(model=self.embeddings)
             emb.embed_query("test")
         except ollama.ResponseError:
+            self._stop_event.set()  # Stop the loading animation
+            thread.join()
             try:
                 subprocess.run(["ollama", "pull", self.embeddings])
                 emb = OllamaEmbeddings(model=self.embeddings)
@@ -407,7 +445,11 @@ Environment Variables:
                 sys.exit()
         try:
             ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
+            self._stop_event.set()  # Stop the loading animation
+            thread.join()
         except ollama.ResponseError:
+            self._stop_event.set()  # Stop the loading animation
+            thread.join()
             try:
                 subprocess.run(["ollama", "pull", self.model])
                 ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
