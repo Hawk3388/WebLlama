@@ -15,9 +15,10 @@ from pydantic import BaseModel
 from typing import Literal
 import importlib.metadata
 import subprocess
-import logging
-import ollama
 import threading
+import logging
+import asyncio
+import ollama
 import time
 import sys
 import re
@@ -251,9 +252,29 @@ Environment Variables:
         self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
         full_answer = ""
         chunks = []
+        think = False
+        remove_newlines_after_think = False
         for chunk in self.answer:
-            chunks.append(chunk.content)
-            full_answer += chunk.content
+            chunk = chunk.content
+            if not self.debug:
+                if "<think>" in chunk:
+                    think = True
+                    print("Thinking...", end="\r")
+                if remove_newlines_after_think:
+                    chunk = chunk.lstrip("\n")
+                    if chunk:
+                        remove_newlines_after_think = False
+                if not think:
+                    chunks.append(chunk)
+                if "</think>" in chunk:
+                    think = False
+                    remove_newlines_after_think = True
+                    print(" " * 30, end="\r")
+                full_answer += chunk
+            else:
+                chunks.append(chunk)
+                full_answer += chunk
+
         if self.debug:
             print(full_answer)
         self.handle_context_determination(full_answer, chunks)
@@ -325,7 +346,7 @@ Environment Variables:
                 if not self.debug:
                     if "<think>" in chunk:
                         think = True
-                        print("thinking...", end="\r")
+                        print("Thinking...", end="\r")
                     if remove_newlines_after_think:
                         chunk = chunk.lstrip("\n")
                         if chunk:
@@ -444,7 +465,7 @@ Environment Variables:
             if not self.debug:
                 if "<think>" in chunk:
                     think = True
-                    print("thinking...", end="\r")
+                    print("Thinking...", end="\r")
                 if remove_newlines_after_think:
                     chunk = chunk.lstrip("\n")
                     if chunk:
@@ -530,18 +551,22 @@ Environment Variables:
     # Method to build the RAG application
     def build_rag(self):
         # List of URLs to load documents from
-        docs = []
+        # docs = []
 
-        for url in self.urls:
-            try:
-                docs.append(WebBaseLoader(url).load())
-                if len(docs) >= self.num_links:
-                    break
-            except Exception:
-                continue
+        # for url in self.urls:
+        #     try:
+        #         docs.append(WebBaseLoader(url).load())
+        #         if len(docs) >= self.num_links:
+        #             break
+        #     except Exception:
+        #         continue
 
-        docs_list = [item for sublist in docs for item in sublist]
+        # docs_list = [item for sublist in docs for item in sublist]
         # Initialize a text splitter with specified chunk size and overlap
+
+        docs = asyncio.run(self.load_all())
+        docs_list = [item for sublist in docs for item in sublist]
+
         text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=1024, chunk_overlap=100
         )
@@ -606,6 +631,23 @@ Environment Variables:
             if self.debug:
                 print(result['href'])
         return self.urls
+    
+    async def load_one(self, url):
+        try:
+            return await asyncio.to_thread(WebBaseLoader(url).load)
+        except Exception:
+            return None
+
+    async def load_all(self):
+        docs = []
+        urls = self.urls.copy()
+        urls = urls[:self.num_links] if len(urls) > self.num_links else urls
+        tasks = [self.load_one(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        for doc in results:
+            if doc:
+                docs.append(doc)
+        return docs
 
     # Method to answer the query
     def answer_query(self):
@@ -620,7 +662,7 @@ Environment Variables:
             if not self.debug:
                 if "<think>" in chunk:
                     think = True
-                    print("thinking...", end="\r")
+                    print("Thinking...", end="\r")
                 if remove_newlines_after_think:
                     chunk = chunk.lstrip("\n")
                     if chunk:
