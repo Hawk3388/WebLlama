@@ -90,9 +90,7 @@ webllama run <model_name>
 ## ToDo's
 
 - Asyncio for parallel webscraping
-- Loading animation from ollama
 - Vision support
-- reasoning support
 
 ## License
 
