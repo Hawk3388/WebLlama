@@ -8,9 +8,11 @@ attrs==25.1.0
 beautifulsoup4==4.13.3
 bs4==0.0.2
 certifi==2025.1.31
+chardet==5.2.0
 charset-normalizer==3.4.1
 click==8.1.8
 colorama==0.4.6
+cssselect==1.3.0
 dataclasses-json==0.6.7
 duckduckgo_search==7.5.2
 exceptiongroup==1.2.2
@@ -31,6 +33,8 @@ langchain-ollama==0.2.3
 langchain-text-splitters==0.3.6
 langsmith==0.3.11
 lxml==5.3.1
+lxml_html_clean==0.4.2
+markdownify==1.1.0
 marshmallow==3.26.1
 multidict==6.1.0
 mypy-extensions==1.0.0
@@ -45,11 +49,13 @@ pydantic-settings==2.8.1
 pydantic_core==2.27.2
 python-dotenv==1.0.1
 PyYAML==6.0.2
+readability-lxml==0.8.4
 regex==2024.11.6
 requests==2.32.3
 requests-toolbelt==1.0.0
 scikit-learn==1.6.1
 scipy==1.15.2
+six==1.17.0
 sniffio==1.3.1
 soupsieve==2.6
 SQLAlchemy==2.0.38
