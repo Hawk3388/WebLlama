@@ -3,19 +3,22 @@ import os
 os.environ['USER_AGENT'] = 'MyCustomUserAgent/1.0'
 
 # Import necessary modules from langchain_community and other libraries
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_community.vectorstores import SKLearnVectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import SKLearnVectorStore
+from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama, OllamaEmbeddings
-from duckduckgo_search import DDGS
 from langchain.prompts import PromptTemplate
-from datetime import date
+from markdownify import markdownify as md
+from duckduckgo_search import DDGS
+from readability import Document
 from pydantic import BaseModel
 from typing import Literal
 import importlib.metadata
+from datetime import date
 import subprocess
 import threading
+import requests
 import logging
 import asyncio
 import ollama
@@ -552,17 +555,17 @@ Environment Variables:
     def build_rag(self):
         # List of URLs to load documents from
         docs = asyncio.run(self.load_all())
-        docs_list = [item for sublist in docs for item in sublist]
+        # docs_list = [item for sublist in docs for item in sublist]
 
         text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=1024, chunk_overlap=100
         )
         # Split the documents into chunks
-        doc_splits = text_splitter.split_documents(docs_list)
+        doc_splits = text_splitter.split_text("\n\n".join(docs)) # .split_documents(docs_list)
 
         # Create embeddings for documents and store them in a vector store
-        vectorstore = SKLearnVectorStore.from_documents(
-            documents=doc_splits,
+        vectorstore = SKLearnVectorStore.from_texts(
+            texts=doc_splits,
             embedding=OllamaEmbeddings(model=self.embeddings),
         )
         retriever = vectorstore.as_retriever(k=self.given_results, similarity_threshold=0.7)
@@ -571,7 +574,7 @@ Environment Variables:
         prompt = PromptTemplate(
             template="""You are an assistant for question-answering tasks.
             Use the following documents and conversation history to answer the question.
-            Don't give unnecessary Informations.
+            Do not include unnecessary Informations in your answer.
             Answer always in the language of the question.
             Don't repeat the question!
             Use three sentences maximum and keep the answer concise:
@@ -619,9 +622,23 @@ Environment Variables:
                 print(result['href'])
         return self.urls
     
+    def scrape_markdown(self, url):
+        try:
+            response = requests.get(url, timeout=10, headers={
+                "User-Agent": "Mozilla/5.0"
+            })
+            doc = Document(response.text)
+            html_content = doc.summary()     # Extract only the main content
+            markdown = md(html_content)      # Convert to Markdown
+            return markdown
+        except Exception as e:
+            print(f"[ERROR] {url} | {e}")
+            return None
+
     async def load_one(self, url):
         try:
-            return await asyncio.to_thread(WebBaseLoader(url).load)
+            # return await asyncio.to_thread(WebBaseLoader(url).load)
+            return await asyncio.to_thread(self.scrape_markdown, url)
         except Exception:
             return None
 
