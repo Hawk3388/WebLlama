@@ -405,7 +405,7 @@ Environment Variables:
                     char = chr(0x2800 + bits)
 
                     # Output: return to the beginning of the line and print
-                    sys.stdout.write(f"\r{char}")
+                    sys.stdout.write(f"\r{char} ")
                     sys.stdout.flush()
                     time.sleep(delay)
         finally:
