@@ -5,7 +5,6 @@ os.environ['USER_AGENT'] = 'MyCustomUserAgent/1.0'
 # Import necessary modules from langchain_community and other libraries
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import SKLearnVectorStore
-from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain.prompts import PromptTemplate
