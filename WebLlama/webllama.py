@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from typing import Literal
 import importlib.metadata
 from datetime import date
+from pathlib import Path
 import subprocess
 import threading
 import requests
@@ -90,6 +91,8 @@ class WebLlama():
         self.fullweb = False
         self.noweb = False
         self.conversation_history = []
+        self.images = []
+        self.image_paths = []
         self.keep_alive = None
         self._stop_event = threading.Event()
         if flags:
@@ -172,21 +175,62 @@ Environment Variables:
             self.rag_chain = rag_chain
 
         # Method to run the RAG application with streaming
-        def run(self, question, conversation_history):
-            answer = ""
-            # Retrieve relevant documents
+        def run(self, question, conversation_history, images=None):
+            # 1) Retriever
             documents = self.retriever.invoke(question)
-            # Extract content from the retrieved documents
-            doc_texts = "\n".join([doc.page_content for doc in documents])
-            # Format conversation history
-            history_text = "\n".join([f"{entry['role']}: {entry['content']}" for entry in conversation_history]) if conversation_history else ""
-            # Current date in the desired format
+            doc_texts = "\n".join(d.page_content for d in documents)
+
+            # 2) History
+            history_text = "\n".join(
+                f"{e['role']}: {e['content']}"
+                for e in conversation_history
+            ) if conversation_history else ""
             to_date = date.today().strftime("%d.%m.%Y")
-            # Prepare input for the language model
-            prompt_input = {"question": question, "documents": doc_texts, "history": history_text, "date": to_date}
-            # Stream the language model's response
-            answer = self.rag_chain.stream(prompt_input)
-            return answer
+
+            # 3) System-Prompt
+            system_prompt = f"""You are an assistant for question-answering tasks.
+    Use the following documents and conversation history to answer the question.
+    Do not include unnecessary information in your answer.
+    Answer always in the language of the question.
+    Don't repeat the question!
+    Use three sentences maximum and keep the answer concise.
+    Only for your context today's date: {to_date}, don't mention it in your answer.
+
+    Conversation History:
+    {history_text}
+
+    Documents:
+    {doc_texts}
+    """
+
+            messages = [{"role": "system", "content": system_prompt}]
+
+            # 4) Attach images
+            if images:
+                content_block = []
+                for img in images:
+                    # Ensure that img is a string path:
+                    img_path = Path(img).absolute()
+                    if not img_path.exists():
+                        raise FileNotFoundError(f"Bild nicht gefunden: {img_path}")
+                    # Ollama does not expect a URI scheme:
+                    content_block.append({
+                        "type": "image_url",
+                        "image_url": str(img_path)
+                    })
+                # Add the question as the last block
+                content_block.append({"type": "text", "text": question})
+                messages.append({
+                    "role": "user",
+                    "content": content_block
+                })
+            else:
+                messages.append({"role": "user", "content": question})
+
+            # 5) Stream to LLaVA / ChatOllama
+            return self.rag_chain.stream(messages)
+
+
 
     # Main loop to handle user input
     def loop(self):
@@ -237,7 +281,7 @@ Environment Variables:
                 print("\n")
 
     def handle_no_websearch_prompt(self):
-        prompt = f"""
+        prompt = [{"role": "system", "content": f"""
         You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
         Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
 
@@ -246,12 +290,24 @@ Environment Variables:
         2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
         3. If explicitly asked to correct something, then and only then should you provide corrections.  
         4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
-        """
+        """}]
+        
         if self.history:
             convo = self.conversation_history.copy()
-            convo.insert(0, {"role": "system", "content": prompt})
-            convo.append({"role": "user", "content": self.question})
-        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+            convo.insert(0, prompt[0])
+            convo.append({"role": "user", "content": [
+                {"type": "text", "text": self.question},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
+        if self.images:
+            peromt = prompt.append({"role": "user", "content": [
+                {"type": "text", "text": self.question},	
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
+        periompt = prompt.append({"role": "user", "content": self.question})
+        self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else peromt if self.images else periompt)
         full_answer = ""
         chunks = []
         think = False
@@ -308,9 +364,20 @@ Environment Variables:
         **User question:** "{self.question}"  
         **Provided answer:** "{full_answer}"  
         """
+        
         if self.history:
             convo = self.conversation_history.copy()
-            convo.append({"role": "user", "content": prompt})
+            convo.append({"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
+        if self.images:
+            prompt = [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]}]
         response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
         self.websearch = self.Websearch.model_validate_json(response.content).websearch
         if self.debug:
@@ -336,8 +403,19 @@ Environment Variables:
                 4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
                 """
                 convo.insert(0, {"role": "system", "content": prompt})
-                convo.append({"role": "user", "content": self.question})
-            self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
+                convo.append({"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                ]+[
+                    {"type": "image_url", "image_url": str(image)} for image in self.images
+                ]})
+
+            if self.images:
+                prompt = [{"role": "user", "content": [
+                    {"type": "text", "text": self.question},
+                ]+[
+                    {"type": "image_url", "image_url": str(image)} for image in self.images
+                ]}]
+            self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else prompt if self.images else self.question)
             full_answer = ""
             print(" " * 30, end="\r")
 
@@ -437,7 +515,17 @@ Environment Variables:
         """
         if self.history:
             convo = self.conversation_history.copy()
-            convo.append({"role": "user", "content": prompt})
+            convo.append({"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
+        if self.images:
+            prompt = [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]}]
         response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
         self.websearch = self.Websearch.model_validate_json(response.content).websearch
         if self.debug:
@@ -456,8 +544,17 @@ Environment Variables:
         """
         if self.history:
             convo = self.conversation_history.copy()
-            convo.insert(0, {"role": "system", "content": prompt})
-            convo.append({"role": "user", "content": self.question})
+            convo.append({"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
+        if self.images:
+            prompt = [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]}]
         self.answer = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.format, verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).stream(convo if self.history else self.question)
         full_answer = ""
         think = False
@@ -518,6 +615,21 @@ Environment Variables:
                 print(f"Error: model '{self.model}' not found")
                 sys.exit()
 
+    def contains_image_paths(self, input_text):
+        # List of supported image file extensions
+        image_extensions = ['.jpg', '.jpeg', '.png']
+        
+        # Regex to detect paths in quotes or without quotes
+        paths = re.findall(r'"(.*?)"|(\S+)', input_text)
+        paths = [p[0] or p[1] for p in paths]  # Extract paths from groups
+        
+        # Check each path
+        image_paths = [path for path in paths if os.path.exists(path) and any(path.lower().endswith(ext) for ext in image_extensions)]
+
+        image_paths = [path.replace("\\", "/") for path in image_paths]
+        
+        return image_paths  # Returns a list of valid image paths
+
     def multiline_input(self, prompt=">>> "):
         first_line = input(prompt)  # Get the first line of input
 
@@ -532,13 +644,27 @@ Environment Variables:
                     break
                 lines.append(line)
 
-            return "\n".join(lines)  # Return the multiline input as a single string
+            input_text = "\n".join(lines)  # Combine multiline input
+        else:
+            input_text = first_line  # Single-line input
 
-        return first_line  # Return normal input if it doesn't start with """
+        # Überprüfen, ob der Input Bildpfade enthält
+        self.image_paths = self.contains_image_paths(input_text)
+
+        if self.debug:
+            print(self.image_paths)
+
+        self.images = self.image_paths.copy()	
+
+        if self.image_paths:
+            for path in self.image_paths:
+                print(f"Added image '{path}'")
+
+        return input_text
     
     def extract_between_system_and_parameter(self, text):
         match = re.search(r'SYSTEM(.*?)PARAMETER', text, flags=re.DOTALL)
-        return match.group(1).strip() if match else None  # Entfernt unnötige Leerzeichen
+        return match.group(1).strip() if match else None  # Removes unnecessary whitespace
     
     def finish_on_number(self, text):
         return text[-1].isdigit() if text else False
@@ -569,23 +695,6 @@ Environment Variables:
         )
         retriever = vectorstore.as_retriever(k=self.given_results, similarity_threshold=0.7)
 
-        # Define the prompt template for the LLM
-        prompt = PromptTemplate(
-            template="""You are an assistant for question-answering tasks.
-            Use the following documents and conversation history to answer the question.
-            Do not include unnecessary Informations in your answer.
-            Answer always in the language of the question.
-            Don't repeat the question!
-            Use three sentences maximum and keep the answer concise:
-            Only for your context today's date: {date}, don't mention it in your answer
-            Conversation History:
-            {history}
-            Question: {question}
-            Documents: {documents}
-            Answer:
-            """,
-            input_variables=["question", "documents", "history", "date"],
-        )
         # Initialize the LLM
         llm = ChatOllama(
             model=self.model,
@@ -604,7 +713,7 @@ Environment Variables:
             keep_alive=self.keep_alive,
         )
         # Create a chain combining the prompt template and LLM
-        rag_chain = prompt | llm | StrOutputParser()
+        rag_chain = llm | StrOutputParser()
 
         # Initialize the RAG application
         rag_application = self.RAGApplication(retriever, rag_chain)
@@ -657,7 +766,21 @@ Environment Variables:
         rag_app = self.build_rag()
         full_answer = ""
         self.conversation_history = self.conversation_history if self.history else []
-        self.answer = rag_app.run(self.question, self.conversation_history)
+        if self.images:
+            # prompt = [{"role": "user", "content": [
+            #     {"type": "text", "text": self.question},
+            # ]+[
+            #     {"type": "image_url", "image_url": str(image)} for image in self.images
+            # ]}]
+            img_urls = [str(img) for img in self.images]
+            # print("QUESTION TYPE:", type(self.question))
+            # print("QUESTION VALUE:", self.question)
+            self.answer = rag_app.run(self.question, self.conversation_history, img_urls)
+        else:
+            # prompt = [{"role": "user", "content": self.question}]
+            # print("QUESTION TYPE:", type(self.question))
+            # print("QUESTION VALUE:", self.question)
+            self.answer = rag_app.run(self.question, self.conversation_history)
         print(" " * 30, end="\r")
         think = False
         remove_newlines_after_think = False
@@ -709,11 +832,21 @@ Environment Variables:
     - **For ongoing topics, trends, or updates that develop over time, use `'m'`.**  
     """
         
+        if self.images:
+            prompt = [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]}]
         if self.history:
-            message = self.conversation_history.copy()
-            message.append({"role": "user", "content": prompt})
+            convo = self.conversation_history.copy()
+            convo.append({"role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]+[
+                {"type": "image_url", "image_url": str(image)} for image in self.images
+            ]})
 
-        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(message if self.history else prompt)
+        response = ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Query.model_json_schema(), verbose=False, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=0.5, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke(convo if self.history else prompt)
 
         format_query = self.Query.model_validate_json(response.content)
         self.query = format_query.search_query
