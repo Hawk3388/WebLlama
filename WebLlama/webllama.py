@@ -54,8 +54,13 @@ Flags:
 Use "webllama [command] --help" for more information about a command.\n""")
         return
     
+    app = None
     if args[0] == "run" and len(args) > 1:
-        WebLlama(args[1], args[2:])
+        try:
+            app = WebLlama(args[1], args[2:])
+        finally:
+            app.close()
+            del app
     elif args[0] == "--version":
         version = importlib.metadata.version("WebLlama")
         print(f"webllama version is {version}")
@@ -585,14 +590,14 @@ Environment Variables:
 
     # Method to get the model and embeddings model
     def get_model(self):
-        thread = threading.Thread(target=self.loading_animation)
-        thread.start()
+        self.thread = threading.Thread(target=self.loading_animation)
+        self.thread.start()
         try:
             emb = OllamaEmbeddings(model=self.embeddings)
             emb.embed_query("test")
         except ollama.ResponseError:
             self._stop_event.set()  # Stop the loading animation
-            thread.join()
+            self.thread.join()
             try:
                 subprocess.run(["ollama", "pull", self.embeddings])
                 emb = OllamaEmbeddings(model=self.embeddings)
@@ -603,10 +608,10 @@ Environment Variables:
         try:
             ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
             self._stop_event.set()  # Stop the loading animation
-            thread.join()
+            self.thread.join()
         except ollama.ResponseError:
             self._stop_event.set()  # Stop the loading animation
-            thread.join()
+            self.thread.join()
             try:
                 subprocess.run(["ollama", "pull", self.model])
                 ChatOllama(model=self.model, num_ctx=self.num_ctx, format=self.Websearch.model_json_schema(), verbose=self.verbose, seed=self.seed, num_predict=self.predict, top_k=self.top_k, top_p=self.top_p, temperature=self.temperature, repeat_penalty=self.repeat_penalty, repeat_last_n=self.repeat_last_n, num_gpu=self.num_gpu, stop=self.stop, keep_alive=self.keep_alive).invoke("test")
@@ -759,6 +764,14 @@ Environment Variables:
             if doc:
                 docs.append(doc)
         return docs
+    
+    def close(self):
+        for attr in list(self.__dict__.keys()):
+            setattr(self, attr, None)
+        if self.thread:
+            self._stop_event.set()
+        if self.debug:
+            print("Closed all processes.")
 
     # Method to answer the query
     def answer_query(self):
