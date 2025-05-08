@@ -58,9 +58,12 @@ Use "webllama [command] --help" for more information about a command.\n""")
     if args[0] == "run" and len(args) > 1:
         try:
             app = WebLlama(args[1], args[2:])
+            app.get_model()
+            app.loop()
         finally:
-            app.close()
-            del app
+            if app:
+                app.close()
+                del app
     elif args[0] == "--version":
         version = importlib.metadata.version("WebLlama")
         print(f"webllama version is {version}")
@@ -158,11 +161,11 @@ Environment Variables:
                 if "--fullweb" in flags:
                     self.fullweb = True
 
-        self.get_model()
+        # self.get_model()
 
         if self.debug:
             logging.basicConfig(level=logging.INFO)
-        self.loop()
+        # self.loop()
         
     # Define a Pydantic model for the query
     class Query(BaseModel):
@@ -192,13 +195,16 @@ Environment Variables:
             to_date = date.today().strftime("%d.%m.%Y")
 
             # 3) System-Prompt
-            system_prompt = f"""You are an assistant for question-answering tasks.
-    Use the following documents and conversation history to answer the question.
-    Do not include unnecessary information in your answer.
-    Answer always in the language of the question.
-    Don't repeat the question!
-    Use three sentences maximum and keep the answer concise.
-    Only for your context today's date: {to_date}, don't mention it in your answer.
+            system_prompt = f"""You are a knowledgeable AI assistant named WebLlama. 
+    Use the retrieved documents and conversation history to provide accurate and helpful answers.
+    
+    Guidelines:
+    - Answer in the same language as the question
+    - Be concise and informative (three sentences maximum)
+    - Provide specific details from the documents when relevant
+    - Don't repeat the question in your answer
+    - Cite sources when appropriate
+    - Today's date for context only: {to_date} (don't mention this in your answer)
 
     Conversation History:
     {history_text}
@@ -286,14 +292,21 @@ Environment Variables:
 
     def handle_no_websearch_prompt(self):
         prompt = [{"role": "system", "content": f"""
-        You are an AI assistant named **WebLlama**. Your task is to process the user's input **without modifying, correcting, or altering factual statements**, even if they appear incorrect.  
-        Only for your context: today's date is {date.today().strftime("%d.%m.%Y")}.
+        You are WebLlama, an AI assistant focused on providing accurate and helpful responses.
+        Today's date is {date.today().strftime("%d.%m.%Y")} (for your reference only).
 
-        ### **Instructions:**  
-        1. **Do NOT correct, fact-check, or modify** any user statements, even if they contain apparent errors.  
-        2. **Only perform the requested task** (e.g., translation, summarization, formatting), without adding comments, opinions, or corrections.  
-        3. If explicitly asked to correct something, then and only then should you provide corrections.  
-        4. Respond **neutrally and objectively**, without assuming that the user wants fact-checking.  
+        ### Core Guidelines:
+        1. **Follow user instructions precisely** - Process their request exactly as asked
+        2. **Maintain neutrality** - Don't modify, correct, or judge user statements
+        3. **Be direct and concise** - Provide clear, straightforward answers
+        4. **Only correct when requested** - Only offer corrections if explicitly asked
+        5. **Match user's language style** - Respond in the same language and tone as the user
+
+        ### Task Processing:
+        - For translations: Preserve meaning and context
+        - For summaries: Capture key points without editorial comments
+        - For formatting: Follow specified format requirements exactly
+        - For creative tasks: Use the information provided without fact-checking
         """}]
         
         if self.history:
@@ -345,25 +358,27 @@ Environment Variables:
         prompt = f"""
         Today's date is {date.today().strftime("%d.%m.%Y")}.
 
-        Task: Determine whether additional context from internet sources is required to answer the user's question based on the provided answer.
+        Task: Evaluate whether this question requires web search for an accurate response.
 
-        **Instructions:**  
-        1. Analyze the question and the given answer carefully.  
-        2. Respond with **'True'** if the provided answer requires **external, real-time, or highly specific data from the Internet**. Examples:  
-        - The answer is incorrect or uncertain.  
-        - There is no clear answer.  
-        - The question or the question refers to real-time information (e.g., news, weather, stock prices).
-        - The question needs any context to answer.  
-        3. Respond with **'False'** if:  
-        - The answer is complete, correct, and does not require internet research.  
-        - The question is about general knowledge (e.g., math, history, defined concepts).  
-        - The question contains polite phrases, small talk, or expressions of gratitude.  
-        - The question is directly addressing you (e.g., "How are you?").  
+        ## Analysis Guidelines:
+        1. Carefully review the question and answer quality
+        2. Evaluate factual accuracy and information recency needs
 
-        ### Examples:
-        - "What is the capital of France?" → False  
-        - "What is the weather like today?" → True  
-        - "Thanks for your response!" → False  
+        ## Respond with "True" if ANY of these apply:
+        - The provided answer contains uncertainties, hedging, or knowledge gaps
+        - The question requires current events, real-time data, or trending information
+        - Specific details like prices, schedules, or availability are requested
+        - Information about recent developments in technology, news, or politics is needed
+        - The answer would benefit from domain-specific expertise found online
+
+        ## Respond with "False" if ANY of these apply:
+        - The answer is already complete, accurate, and sufficient
+        - The question is about general knowledge, concepts, or mathematics
+        - The interaction is conversational (greetings, gratitude, opinions)
+        - The question is directed at your capabilities or limitations
+        - The request is for creative content, fiction, or hypotheticals
+
+        If unsure, default to "True" to provide the best possible response.
 
         **User question:** "{self.question}"  
         **Provided answer:** "{full_answer}"  
@@ -499,21 +514,27 @@ Environment Variables:
         prompt = f"""
         Today's date is {date.today().strftime("%d.%m.%Y")}.
 
-        Task: Determine whether additional context from internet sources is required to answer the user's question.  
+        Task: Determine whether this question requires web search for accurate answering.
 
-        **Instructions:**  
-        1. Carefully analyze the user's question and the chat history.  
-        2. Ignore any pre-existing knowledge and questions in the chat history, concentrate only on the users question.  
-        3. Respond with **'True'** if the question requires **external, real-time, or highly specific data from the Internet** or if your last knowledge update is too old to answer the question accurately. Examples:  
-        - Recent news, weather, stock prices, sports results, events.  
-        - Current product prices, availability, schedules, or policies.  
-        - Information about specific people, locations, or businesses.
-        - Political events, election results, or government policies.
-        4. Respond with **'False'** if:  
-        - The question can be answered based on the given chat history.
-        - The question is conversational (e.g., greetings, small talk, "Thank you").  
-        - The question addresses you.
-        5. If you are unsure about the answer, choose **'True'**.
+        ## Evaluation Criteria:
+        1. Focus only on the current question, not previous conversation history
+        2. Analyze what information is needed to provide a complete answer
+
+        ## Web Search Required (True) if:
+        - Question asks about recent events, news, or current affairs
+        - Information requested is time-sensitive (weather, prices, schedules)
+        - Question refers to specific products, businesses, or locations
+        - Data like statistics, market trends, or public figures' recent activities
+        - Technical specifications, documentation, or specialized knowledge
+        
+        ## Web Search NOT Required (False) if:
+        - Question is about general knowledge, concepts, or timeless facts
+        - Simple greetings or conversational exchanges ("hello", "thank you")
+        - Questions about your capabilities or limitations as an AI
+        - Requests for creative content, opinion, or hypothetical scenarios
+        - Question can be answered with common knowledge
+        
+        Default to True if uncertain.
 
         **User question:** "{self.question}"  
         """
@@ -766,10 +787,11 @@ Environment Variables:
         return docs
     
     def close(self):
-        for attr in list(self.__dict__.keys()):
-            setattr(self, attr, None)
         if self.thread:
             self._stop_event.set()
+            self.thread.join()
+        for attr in list(self.__dict__.keys()):
+            setattr(self, attr, None)
         if self.debug:
             print("Closed all processes.")
 
@@ -825,23 +847,32 @@ Environment Variables:
     def search_query(self):
         to_date = date.today().strftime("%d.%m.%Y")
         prompt = f"""
-    Todays date is {to_date}.
-    Based on the following user question, formulate a concise and effective search query:
+    Today's date is {to_date}.
+    
+    ## Task: Create an effective search query for this user question:
     "{self.question}"
-    Your task:
-    1. Create a search query of that will yield relevant results and contains all the relevant informations from the user question. If it is a topical question, it makes sense to include the date in the search query. If there is not a question or it is a personal question return **None**. If it does not make sense to make a web search to answer the question also return **None**
-    2. Determine if a specific time range is needed for the search.  
-
-    **Time range options:**  
-    - `'w'` (past week): **Use for events or schedules that are updated frequently.** Example: "What shows are currently playing at the Kennedy Center?"  
-    - `'m'` (past month): Use for relatively recent information or ongoing events.  
-    - `'y'` (past year): Use for annual events or information that changes yearly.  
-    - `'none'`: No time limit. Use for historical information or topics not tied to a specific time frame.  
-
-    **Guidance:**  
-    - If you are unsure about the time range, **always default to 'none'**.  
-    - **For event schedules (e.g., theater plays, concerts, sports games), use `'w'`.**  
-    - **For ongoing topics, trends, or updates that develop over time, use `'m'`.**  
+    
+    ## Instructions:
+    1. Create a concise search query that will yield relevant, high-quality results
+       - Include key terms, concepts, and any specific requirements from the question
+       - Add date information if the topic is time-sensitive 
+       - For factual queries, use clear descriptive terms
+       - For technical questions, include relevant technologies or frameworks
+    
+    2. If this is NOT searchable, return **None** for these cases:
+       - Personal questions (about the user or yourself)
+       - Simple greetings or gratitude expressions
+       - Requests for opinions or hypothetical scenarios
+       - General tasks not requiring factual information
+    
+    3. Determine appropriate time range for the search:
+       - `w` (past week): For very recent events, current prices, schedules, news
+       - `m` (past month): For recent but not breaking developments, ongoing events
+       - `y` (past year): For annual events, reports, or information updated yearly
+       - `none`: For historical information, concepts, or timeless topics
+    
+    Default to `none` if uncertain about time constraints.
+    Always prioritize accuracy and relevance in your query construction.
     """
         
         if self.images:
