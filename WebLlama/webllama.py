@@ -884,6 +884,7 @@ Environment Variables:
        - Add date information if the topic is time-sensitive 
        - For factual queries, use clear descriptive terms
        - For technical questions, include relevant technologies or frameworks
+       - IMPORTANT: If the question contains URLs, ALWAYS include these URLs in your search query
     
     2. If this is NOT searchable, return **None** for these cases:
        - Personal questions (about the user or yourself)
