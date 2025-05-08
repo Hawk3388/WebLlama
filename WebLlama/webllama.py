@@ -816,6 +816,8 @@ Environment Variables:
         if self.thread:
             self._stop_event.set()
             self.thread.join()
+        subprocess.run(["ollama", "stop", self.model])
+        subprocess.run(["ollama", "stop", self.embeddings])
         for attr in list(self.__dict__.keys()):
             setattr(self, attr, None)
         if self.debug:
