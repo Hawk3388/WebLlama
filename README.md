@@ -92,7 +92,7 @@ webllama run <model_name>
 - Asyncio for parallel webscraping   ✅
 - Loading animation from ollama      ✅
 - reasoning support                  ✅
-- Vision support
+- Vision support                     ✅
 
 ## License
 
