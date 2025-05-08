@@ -87,7 +87,7 @@ Use "webllama [command] --help" for more information about a command.\n""")
     except Exception as e:
         if app:
             try:
-                app.close()
+                app.close(exception=e)
             except:
                 pass
         sys.exit(1)
@@ -807,7 +807,12 @@ Environment Variables:
                 docs.append(doc)
         return docs
     
-    def close(self):
+    def close(self, exception=None):
+        if self.debug:
+            if exception:
+                print(f"The programm exited due to this exception: {exception}")
+            else:
+                print("The programm exited.")
         if self.thread:
             self._stop_event.set()
             self.thread.join()
