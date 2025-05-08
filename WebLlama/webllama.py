@@ -54,22 +54,43 @@ Flags:
 Use "webllama [command] --help" for more information about a command.\n""")
         return
     
+    # Define app outside the try block
     app = None
-    if args[0] == "run" and len(args) > 1:
-        try:
-            app = WebLlama(args[1], args[2:])
-            app.get_model()
-            app.loop()
-        finally:
-            if app:
+    
+    try:
+        if args[0] == "run" and len(args) > 1:
+            try:
+                app = WebLlama(args[1], args[2:])
+                app.get_model()
+                app.loop()
+            finally:
+                if app:
+                    try:
+                        app.close()
+                    except:
+                        pass
+                    app = None
+        elif args[0] == "--version":
+            version = importlib.metadata.version("WebLlama")
+            print(f"webllama version is {version}")
+            subprocess.run(["ollama"] + ["--version"])
+        else:
+            subprocess.run(["ollama"] + args)
+    except KeyboardInterrupt:
+        # app is always defined here since we defined it outside the try block
+        if app:
+            try:
                 app.close()
-                del app
-    elif args[0] == "--version":
-        version = importlib.metadata.version("WebLlama")
-        print(f"webllama version is {version}")
-        subprocess.run(["ollama"] + ["--version"])
-    else:
-        subprocess.run(["ollama"] + args)
+            except:
+                pass
+        sys.exit(0)
+    except Exception as e:
+        if app:
+            try:
+                app.close()
+            except:
+                pass
+        sys.exit(1)
 
 # Define the main ChatWeb class
 class WebLlama():
@@ -132,7 +153,7 @@ Environment Variables:
                 if "--keepalive" in flags:
                     index = flags.index("--keepalive")
                     keepalive_str = flags[index + 1]
-                    # Prüfe, ob das Format exakt "<Zahl><Einzelbuchstabe>" ist
+                    # Check if the format is exactly "<number><single letter>"
                     m = re.fullmatch(r'(\d+)([a-zA-Z]+)', keepalive_str)
                     if m:
                         number, unit = m.groups()
@@ -142,7 +163,7 @@ Environment Variables:
                             print(f'Error: time: unknown unit "{unit}" in duration "{keepalive_str}"')
                             sys.exit()
                     else:
-                        # Prüfe auf das Format mit zusätzlichen Ziffern, z.B. "55s5" oder "55zt5"
+                        # Check for the format with additional digits, e.g. "55s5" or "55zt5"
                         m2 = re.fullmatch(r'(\d+)([a-zA-Z]+)(\d+)$', keepalive_str)
                         if m2:
                             number, unit, extra = m2.groups()
@@ -222,7 +243,7 @@ Environment Variables:
                     # Ensure that img is a string path:
                     img_path = Path(img).absolute()
                     if not img_path.exists():
-                        raise FileNotFoundError(f"Bild nicht gefunden: {img_path}")
+                        raise FileNotFoundError(f"Image not found: {img_path}")
                     # Ollama does not expect a URI scheme:
                     content_block.append({
                         "type": "image_url",
@@ -269,7 +290,7 @@ Environment Variables:
                             if self.urls:
                                 self.answer_query()
                             else:
-                                logging.error("Keine URLs gefunden.")
+                                logging.error("No URLs found.")
                     else:
                         self.handle_no_websearch_prompt()
                 elif self.fullweb:
@@ -281,7 +302,7 @@ Environment Variables:
                     if self.urls:
                         self.answer_query()
                     else:
-                        logging.error("Keine URLs gefunden.")
+                        logging.error("No URLs found.")
                 elif self.noweb:
                     if self.debug:
                         print("noweb")
@@ -467,7 +488,7 @@ Environment Variables:
             if self.urls:
                 self.answer_query()
             else:
-                logging.error("Keine URLs gefunden.")
+                logging.error("No URLs found.")
 
     def print_chunks(self, chunks, full_answer):
         for chunk in chunks:
@@ -673,7 +694,7 @@ Environment Variables:
         else:
             input_text = first_line  # Single-line input
 
-        # Überprüfen, ob der Input Bildpfade enthält
+        # Check if the input contains image paths
         self.image_paths = self.contains_image_paths(input_text)
 
         if self.debug:
