@@ -829,19 +829,9 @@ Environment Variables:
         full_answer = ""
         self.conversation_history = self.conversation_history if self.history else []
         if self.images:
-            # prompt = [{"role": "user", "content": [
-            #     {"type": "text", "text": self.question},
-            # ]+[
-            #     {"type": "image_url", "image_url": str(image)} for image in self.images
-            # ]}]
             img_urls = [str(img) for img in self.images]
-            # print("QUESTION TYPE:", type(self.question))
-            # print("QUESTION VALUE:", self.question)
             self.answer = rag_app.run(self.question, self.conversation_history, img_urls)
         else:
-            # prompt = [{"role": "user", "content": self.question}]
-            # print("QUESTION TYPE:", type(self.question))
-            # print("QUESTION VALUE:", self.question)
             self.answer = rag_app.run(self.question, self.conversation_history)
         print(" " * 30, end="\r")
         think = False
