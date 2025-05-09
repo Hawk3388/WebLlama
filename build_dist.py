@@ -1,6 +1,6 @@
 import subprocess
-import sys
 import shutil
+import sys
 import os
 
 def clean_build_artifacts():
