@@ -100,15 +100,15 @@ def update():
         # Get current version
         current_version = importlib.metadata.version("WebLlama")
 
-        if current_version.endswith("pre0"):
+        if current_version.endswith("rc0"):
             try:
-                print("You are using a pre-release version. We try to update to the latest pre-release version.")
-                print("Downloading and installing the latest pre-release version...", end="\r")
+                print("You are using a test-release version. We try to update to the latest test-release version.")
+                print("Downloading and installing the latest test-release version...", end="\r")
                 subprocess.run(["pip", "install", "--user", "git+https://github.com/Hawk3388/WebLlama.git@main"])
-                print("Successfully updated to the latest pre-release version.")
+                print("Successfully updated to the latest test-release version.")
             except subprocess.CalledProcessError as e:
-                print(f"Error updating to the latest pre-release version: {e}")
-                print("You can manually install the latest pre-release version with:")
+                print(f"Error updating to the latest test-release version: {e}")
+                print("You can manually install the latest test-release version with:")
                 print("pip install --user git+https://github.com/Hawk3388/WebLlama.git@main")
         else:
             # GitHub repository information
@@ -127,7 +127,7 @@ def update():
             response = requests.get(api_url, headers=headers)
             
             if response.status_code != 200:
-                print(f"Error fetching release information. Status code: {response.status_code}")
+                print(f"Error fetching release information. Status code: {response.status_code}                     ")
                 print(f"Response: {response.text}")
                 return
             
@@ -135,22 +135,22 @@ def update():
             latest_version = release_data.get("tag_name", "").lstrip("v")
             
             if not latest_version:
-                print("Could not determine the latest version.")
+                print("Could not determine the latest version.                              ")
                 return
             
             # Compare versions
             if latest_version == current_version:
-                print("You already have the latest version installed.")
+                print("You already have the latest version installed.                       ")
                 return
             
             # Parse versions for comparison
             def parse_version(version_str):
-                # Handle pre-release versions like 1.5.1-pre0
+                # Handle test-release versions like 1.5.1-rc0
                 if "-" in version_str:
-                    version_part, prerelease = version_str.split("-", 1)
+                    version_part, testrelease = version_str.split("-", 1)
                     version_nums = [int(x) for x in version_part.split(".")]
-                    # Pre-releases are considered older than their final releases
-                    return version_nums, prerelease
+                    # test-releases are considered older than their final releases
+                    return version_nums, testrelease
                 else:
                     return [int(x) for x in version_str.split(".")], ""
             
@@ -162,15 +162,15 @@ def update():
             if current_version_parsed[0] < latest_version_parsed[0]:  # Compare version numbers
                 is_newer = True
             elif current_version_parsed[0] == latest_version_parsed[0]:
-                # If version numbers are equal, no pre-release is newer than a pre-release
+                # If version numbers are equal, no test-release is newer than a test-release
                 if current_version_parsed[1] and not latest_version_parsed[1]:
                     is_newer = True
-                # Both are pre-releases or not, compare the pre-release identifiers
+                # Both are test-releases or not, compare the test-release identifiers
                 elif current_version_parsed[1] < latest_version_parsed[1]:
                     is_newer = True
             
             if not is_newer:
-                print("No newer version available.")
+                print("No newer version available.                      ")
                 return
                 
             print(f"A newer version ({latest_version}) is available. Current version: {current_version}")
@@ -183,7 +183,7 @@ def update():
                     break
             
             if not whl_asset:
-                print("No .whl file found in the latest release.")
+                print("No .whl file found in the latest release.                        ")
                 return
             
             download_url = whl_asset["browser_download_url"]
@@ -202,7 +202,7 @@ def update():
                 for chunk in whl_response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            print(f"Installing {whl_filename}... (Dies kann einen Moment dauern)", end="\r")
+            print(f"Installing {whl_filename}...", end="\r")
             try:
                 # First check if we're running as the webllama command
                 is_webllama_command = os.path.basename(sys.argv[0]).lower() in ["webllama", "webllama.exe"]
@@ -213,13 +213,13 @@ def update():
                 try:                
                     # Run the installation with visible output so user can see progress
                     subprocess.run(pip_args, capture_output=True, check=True)
-                    print(f"Successfully updated WebLlama to version {latest_version}")
+                    print(f"Successfully updated WebLlama to version {latest_version}                   ")
                 except subprocess.CalledProcessError as pip_error:# If installation failed and we're running as the webllama command, it might 
                     # be due to the executable being in use
                     if is_webllama_command:
                         error_msg = str(pip_error).lower()
                         if "der prozess kann nicht auf die datei zugreifen" in error_msg or "process cannot access the file" in error_msg:
-                            print("Update failed because WebLlama is currently running.")
+                            print("Update failed because WebLlama is currently running.                                     ")
                             print("Please close all instances of WebLlama and run the update again, or use:")
                             print(f"pip install --user --upgrade {download_path}")
                             return
