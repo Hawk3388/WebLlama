@@ -100,7 +100,7 @@ def update():
         # Get current version
         current_version = importlib.metadata.version("WebLlama")
 
-        if current_version.endswith("-pre0"):
+        if current_version.endswith("pre0"):
             try:
                 print("You are using a pre-release version. We try to update to the latest pre-release version.")
                 print("Downloading and installing the latest pre-release version...", end="\r")
