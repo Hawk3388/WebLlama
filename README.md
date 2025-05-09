@@ -73,6 +73,7 @@ webllama [command]
 - **cp**: Copy a model
 - **rm**: Remove a model
 - **help**: Help about any command
+- **update**: Update webllama
 
 ### Flags
 
