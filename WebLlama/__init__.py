@@ -1,1 +1,1 @@
-from .webllama import main, WebLlama
+from .webllama import main, WebLlama, update

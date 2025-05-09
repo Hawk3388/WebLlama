@@ -46,6 +46,7 @@ Available Commands:
   cp          Copy a model
   rm          Remove a model
   help        Help about any command
+  update      Update webllama
 
 Flags:
   -h, --help      help for webllama
@@ -70,6 +71,8 @@ Use "webllama [command] --help" for more information about a command.\n""")
                     except:
                         pass
                     app = None
+        elif args[0] == "update":
+            update()
         elif args[0] == "--version":
             version = importlib.metadata.version("WebLlama")
             print(f"webllama version is {version}")
@@ -91,6 +94,151 @@ Use "webllama [command] --help" for more information about a command.\n""")
             except:
                 pass
         sys.exit(1)
+
+def update():
+    try:
+        # Get current version
+        current_version = importlib.metadata.version("WebLlama")
+
+        if current_version.endswith("-pre0"):
+            try:
+                print("You are using a pre-release version. We try to update to the latest pre-release version.")
+                print("Downloading and installing the latest pre-release version...", end="\r")
+                subprocess.run(["pip", "install", "--user", "git+https://github.com/Hawk3388/WebLlama.git@main"])
+                print("Successfully updated to the latest pre-release version.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error updating to the latest pre-release version: {e}")
+                print("You can manually install the latest pre-release version with:")
+                print("pip install --user git+https://github.com/Hawk3388/WebLlama.git@main")
+        else:
+            # GitHub repository information
+            repo_owner = "Hawk3388"
+            repo_name = "WebLlama"
+            
+            print(f"Checking for updates from GitHub ({repo_owner}/{repo_name})...", end="\r")
+            
+            # Fetch latest release information from GitHub API
+            api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "WebLlama-UpdateClient"
+            }
+            
+            response = requests.get(api_url, headers=headers)
+            
+            if response.status_code != 200:
+                print(f"Error fetching release information. Status code: {response.status_code}")
+                print(f"Response: {response.text}")
+                return
+            
+            release_data = response.json()
+            latest_version = release_data.get("tag_name", "").lstrip("v")
+            
+            if not latest_version:
+                print("Could not determine the latest version.")
+                return
+            
+            # Compare versions
+            if latest_version == current_version:
+                print("You already have the latest version installed.")
+                return
+            
+            # Parse versions for comparison
+            def parse_version(version_str):
+                # Handle pre-release versions like 1.5.1-pre0
+                if "-" in version_str:
+                    version_part, prerelease = version_str.split("-", 1)
+                    version_nums = [int(x) for x in version_part.split(".")]
+                    # Pre-releases are considered older than their final releases
+                    return version_nums, prerelease
+                else:
+                    return [int(x) for x in version_str.split(".")], ""
+            
+            current_version_parsed = parse_version(current_version)
+            latest_version_parsed = parse_version(latest_version)
+            
+            # Check if the latest version is newer
+            is_newer = False
+            if current_version_parsed[0] < latest_version_parsed[0]:  # Compare version numbers
+                is_newer = True
+            elif current_version_parsed[0] == latest_version_parsed[0]:
+                # If version numbers are equal, no pre-release is newer than a pre-release
+                if current_version_parsed[1] and not latest_version_parsed[1]:
+                    is_newer = True
+                # Both are pre-releases or not, compare the pre-release identifiers
+                elif current_version_parsed[1] < latest_version_parsed[1]:
+                    is_newer = True
+            
+            if not is_newer:
+                print("No newer version available.")
+                return
+                
+            print(f"A newer version ({latest_version}) is available. Current version: {current_version}")
+            
+            # Find the .whl file in assets
+            whl_asset = None
+            for asset in release_data.get("assets", []):
+                if asset["name"].endswith(".whl"):
+                    whl_asset = asset
+                    break
+            
+            if not whl_asset:
+                print("No .whl file found in the latest release.")
+                return
+            
+            download_url = whl_asset["browser_download_url"]
+            whl_filename = whl_asset["name"]
+            
+            print(f"Downloading {whl_filename}...", end="\r")
+            
+            # Download the .whl file
+            whl_response = requests.get(download_url, stream=True)
+            if whl_response.status_code != 200:
+                print(f"Error downloading .whl file. Status code: {whl_response.status_code}")
+                return
+            
+            download_path = Path(os.path.join(os.getcwd(), whl_filename))
+            with open(download_path, 'wb') as f:
+                for chunk in whl_response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            print(f"Installing {whl_filename}... (Dies kann einen Moment dauern)", end="\r")
+            try:
+                # First check if we're running as the webllama command
+                is_webllama_command = os.path.basename(sys.argv[0]).lower() in ["webllama", "webllama.exe"]
+                
+                # Use pip to install the .whl file with --user flag to avoid permission issues
+                pip_args = [sys.executable, "-m", "pip", "install", "--user", "--upgrade", str(download_path)]
+                # Try the installation            
+                try:                
+                    # Run the installation with visible output so user can see progress
+                    subprocess.run(pip_args, capture_output=True, check=True)
+                    print(f"Successfully updated WebLlama to version {latest_version}")
+                except subprocess.CalledProcessError as pip_error:# If installation failed and we're running as the webllama command, it might 
+                    # be due to the executable being in use
+                    if is_webllama_command:
+                        error_msg = str(pip_error).lower()
+                        if "der prozess kann nicht auf die datei zugreifen" in error_msg or "process cannot access the file" in error_msg:
+                            print("Update failed because WebLlama is currently running.")
+                            print("Please close all instances of WebLlama and run the update again, or use:")
+                            print(f"pip install --user --upgrade {download_path}")
+                            return
+                    else:
+                        # Some other error occurred, re-raise it
+                        raise pip_error
+                
+                # Clean up the downloaded file
+                os.remove(download_path)
+                
+                print(f"Webllama has been updated to version {latest_version} successfully.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error installing the .whl file: {e}")
+                print("You can manually install the downloaded file with:")
+                print(f"pip install --upgrade {download_path}")
+    except Exception as e:
+        print(f"An error occurred during the update process: {e}")
+        print("You can manually download and install the latest version from:")
+        print("https://github.com/Hawk3388/WebLlama/releases")
 
 # Define the main ChatWeb class
 class WebLlama():
@@ -260,8 +408,6 @@ Environment Variables:
 
             # 5) Stream to LLaVA / ChatOllama
             return self.rag_chain.stream(messages)
-
-
 
     # Main loop to handle user input
     def loop(self):
