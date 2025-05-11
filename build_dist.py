@@ -7,12 +7,6 @@ def clean_build_artifacts():
     """Temporäre Build-Verzeichnisse entfernen"""
     artifacts = ["WebLlama.egg-info", "build"]
     
-    # __pycache__ Ordner finden und zur Liste hinzufügen
-    for root, dirs, _ in os.walk("."):
-        for d in dirs:
-            if d == "__pycache__":
-                artifacts.append(os.path.join(root, d))
-    
     for artifact in artifacts:
         if os.path.exists(artifact):
             try:
