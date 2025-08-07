@@ -8,13 +8,13 @@ from langchain_community.vectorstores import SKLearnVectorStore
 from langchain_core.output_parsers import StrOutputParser
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from markdownify import markdownify as md
-from duckduckgo_search import DDGS
 from readability import Document
 from pydantic import BaseModel
 from typing import Literal
 import importlib.metadata
 from datetime import date
 from pathlib import Path
+from ddgs import DDGS
 import subprocess
 import threading
 import requests
